@@ -1,60 +1,117 @@
 import {
-  LayoutDashboard,
+  Building2,
   Users,
-  UserCircle,
-  UserRound,
+  BarChart3,
+  Settings,
+  ChevronLeft,
+  ShieldCheck,
 } from "lucide-react";
 
-function Sidebar({ currentPage, setCurrentPage }) {
+function Sidebar({
+  activePage,
+  setActivePage,
+  currentUser,
+  onRoleChange,
+}) {
+  const menuItems = [
+    {
+      id: "customers",
+      label: "Khách hàng",
+      icon: Building2,
+    },
+    {
+      id: "contacts",
+      label: "Người liên hệ",
+      icon: Users,
+    },
+    {
+      id: "reports",
+      label: "Báo cáo",
+      icon: BarChart3,
+    },
+  ];
+
+  const isTeamLeader = currentUser?.role === "team_leader";
+
   return (
     <aside className="sidebar">
-      <div className="logo">
-        <div className="logo-icon">CRM</div>
+      <div className="sidebar-header">
+        <div className="logo-box">
+          <Building2 size={22} />
+        </div>
 
-        <div>
-          <strong>CRM System</strong>
+        <div className="logo-text">
+          <strong>CRM</strong>
           <span>Customer Management</span>
         </div>
       </div>
 
-      <div className="menu-section">TỔNG QUAN</div>
+      <div className="sidebar-section">
+        <p className="sidebar-title">QUẢN LÝ</p>
 
-      <button
-        className={`menu-item ${
-          currentPage === "dashboard" ? "active" : ""
-        }`}
-        onClick={() => setCurrentPage("dashboard")}
-      >
-        <LayoutDashboard size={18} />
-        <span>Dashboard</span>
-      </button>
+        {menuItems.map((item) => {
+          const Icon = item.icon;
 
-      <button className="menu-item">
-        <Users size={18} />
-        <span>Khách hàng</span>
-      </button>
+          return (
+            <button
+              key={item.id}
+              className={`sidebar-item ${
+                activePage === item.id ? "active" : ""
+              }`}
+              onClick={() => setActivePage(item.id)}
+            >
+              <Icon size={19} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      <div className="menu-section">QUẢN TRỊ</div>
+      <div className="sidebar-bottom">
+        <button className="sidebar-item">
+          <Settings size={19} />
+          <span>Cài đặt</span>
+        </button>
 
-      <button
-        className={`menu-item ${
-          currentPage === "users" ? "active" : ""
-        }`}
-        onClick={() => setCurrentPage("users")}
-      >
-        <UserRound size={18} />
-        <span>Người dùng</span>
-      </button>
+        {/* Khu vực chuyển quyền để demo */}
+        <div className="role-switcher">
+          <div className="role-switcher-title">
+            <ShieldCheck size={16} />
+            <span>Quyền demo</span>
+          </div>
 
-      <button
-        className={`menu-item ${
-          currentPage === "profile" ? "active" : ""
-        }`}
-        onClick={() => setCurrentPage("profile")}
-      >
-        <UserCircle size={18} />
-        <span>Hồ sơ cá nhân</span>
-      </button>
+          <select
+            value={currentUser?.role || "employee"}
+            onChange={(event) => onRoleChange(event.target.value)}
+          >
+            <option value="employee">
+              Nhân viên kinh doanh
+            </option>
+
+            <option value="team_leader">
+              Trưởng nhóm kinh doanh
+            </option>
+          </select>
+        </div>
+
+        <div className="user-card">
+          <div className="user-avatar">
+            {isTeamLeader ? "TL" : "NV"}
+          </div>
+
+          <div className="user-info">
+            <strong>{currentUser?.name}</strong>
+
+            <span>
+              {isTeamLeader
+                ? "Trưởng nhóm kinh doanh"
+                : "Nhân viên kinh doanh"}
+            </span>
+          </div>
+
+          <ChevronLeft size={16} />
+        </div>
+      </div>
     </aside>
   );
 }
