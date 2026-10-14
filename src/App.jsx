@@ -1,6 +1,7 @@
 
 import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import EmbeddedLeadForm from "./components/EmbeddedLeadForm.jsx";
 import {
   Users,
   Target,
@@ -10,7 +11,6 @@ import {
   Search,
   Upload,
   Download,
-  Copy,
   LayoutDashboard,
   Megaphone,
   CheckCircle2,
@@ -110,14 +110,6 @@ function App() {
   const [errors, setErrors] = useState([]);
   const [fileName, setFileName] = useState("");
   const [previewRows, setPreviewRows] = useState([]);
-  const [embedUrl, setEmbedUrl] = useState("");
-  const [publicForm, setPublicForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    company: "",
-    interest: "",
-  });
   const [ipWindow, setIpWindow] = useState({ count: 0, startedAt: 0 });
 
   function notify(message, type = "success") {
@@ -460,23 +452,7 @@ function App() {
     );
   }
 
-  const embedCode = `<iframe src="${embedUrl || "https://your-domain.example/lead-form"}" title="Đăng ký tư vấn" width="100%" height="600"></iframe>`;
-
-  async function copyEmbed() {
-    try {
-      await navigator.clipboard.writeText(embedCode);
-      notify("Đã sao chép mã nhúng.");
-    } catch {
-      notify(
-        "Trình duyệt không cho phép sao chép tự động. Hãy chọn mã và nhấn Ctrl+C.",
-        "error"
-      );
-    }
-  }
-
-  function submitPublicForm(event) {
-    event.preventDefault();
-
+  function submitPublicForm(publicForm) {
     const now = Date.now();
     const windowMs = 60 * 1000;
 
@@ -540,15 +516,8 @@ function App() {
       ...previous,
     ]);
 
-    setPublicForm({
-      name: "",
-      email: "",
-      phone: "",
-      company: "",
-      interest: "",
-    });
-
     notify("Gửi thông tin thành công!");
+    return true;
   }
 
   const pageTitle =
@@ -916,126 +885,10 @@ function App() {
         )}
 
         {page === "embed" && (
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <h3>Biểu mẫu thu thập Lead</h3>
-                <p>
-                  Tạo mã nhúng và xem trước biểu mẫu đăng ký tư vấn
-                </p>
-              </div>
-            </div>
-
-            <div className="field embed-url-field">
-              <label>Địa chỉ biểu mẫu đã triển khai (tùy chọn)</label>
-              <input
-                value={embedUrl}
-                onChange={(event) => setEmbedUrl(event.target.value)}
-                placeholder="https://ten-mien-cua-ban.vn/lead-form"
-              />
-            </div>
-
-            <div className="info-box">
-              <Code2 size={20} />
-              <div>
-                <strong>Mã iframe để nhúng vào website</strong>
-                <p>
-                  Thay địa chỉ mẫu bằng URL biểu mẫu thực tế đã triển khai.
-                </p>
-              </div>
-            </div>
-
-            <pre className="code-area">{embedCode}</pre>
-
-            <button className="btn primary" onClick={copyEmbed}>
-              <Copy size={17} />
-              Sao chép mã nhúng
-            </button>
-
-            <div className="form-preview">
-              <span className="eyebrow">FORM PREVIEW</span>
-              <h3>Đăng ký nhận tư vấn</h3>
-              <p>Để lại thông tin để đội ngũ Marketing liên hệ với bạn.</p>
-
-              <form className="form-grid" onSubmit={submitPublicForm}>
-                <Field
-                  label="Họ và tên *"
-                  value={publicForm.name}
-                  onChange={(event) =>
-                    setPublicForm({
-                      ...publicForm,
-                      name: event.target.value,
-                    })
-                  }
-                  placeholder="Nguyễn Văn A"
-                  required
-                />
-                <Field
-                  label="Email *"
-                  type="email"
-                  value={publicForm.email}
-                  onChange={(event) =>
-                    setPublicForm({
-                      ...publicForm,
-                      email: event.target.value,
-                    })
-                  }
-                  placeholder="email@congty.com"
-                  required
-                />
-                <Field
-                  label="Số điện thoại *"
-                  value={publicForm.phone}
-                  onChange={(event) =>
-                    setPublicForm({
-                      ...publicForm,
-                      phone: event.target.value,
-                    })
-                  }
-                  placeholder="0912345678"
-                  required
-                />
-                <Field
-                  label="Công ty *"
-                  value={publicForm.company}
-                  onChange={(event) =>
-                    setPublicForm({
-                      ...publicForm,
-                      company: event.target.value,
-                    })
-                  }
-                  placeholder="Tên công ty"
-                  required
-                />
-                <Field
-                  label="Nhu cầu quan tâm *"
-                  value={publicForm.interest}
-                  onChange={(event) =>
-                    setPublicForm({
-                      ...publicForm,
-                      interest: event.target.value,
-                    })
-                  }
-                  placeholder="Nhu cầu tư vấn"
-                  required
-                />
-                <div className="form-actions">
-                  <button className="btn primary" type="submit">
-                    Gửi thông tin
-                  </button>
-                </div>
-              </form>
-              <p className="muted">
-                Đây là biểu mẫu thử nghiệm trong ứng dụng React hiện tại.
-              </p>
-            </div>
-
-            <p className="muted">
-              Lưu ý: giới hạn gửi trong bản demo chỉ hoạt động ở trình duyệt
-              hiện tại. Khi triển khai thực tế, cần chống spam và giới hạn
-              tần suất tại Backend để bảo vệ hệ thống.
-            </p>
-          </section>
+          <EmbeddedLeadForm
+            onSubmitLead={submitPublicForm}
+            onNotify={notify}
+          />
         )}
 
         {page === "campaigns" && (
