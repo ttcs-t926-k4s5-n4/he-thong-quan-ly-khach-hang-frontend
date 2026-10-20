@@ -146,19 +146,658 @@ function Pagination({ currentPage, totalItems, pageSize, onPageChange, onPageSiz
   )
 }
 
+export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
+  const [activeTab, setActiveTab] = useState('single')
+  const [opts, setOpts] = useState({ users: [], campaigns: [] })
+  const [form, setForm] = useState({
+    full_name: '',
+    phone: '',
+    email: '',
+    company: '',
+    interest: '',
+    source: 'danh_thiep',
+    source_detail: '',
+    industry: '',
+    company_size: '',
+    region: '',
+    interest_level: 'Cao',
+    campaign_id: ''
+  })
+  const [showDetails, setShowDetails] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [m, setM] = useState('')
+  const [err, setErr] = useState(false)
+
+  // Excel quick import inside modal
+  const [file, setFile] = useState(null)
+  const [sourceExcel, setSourceExcel] = useState('danh_thiep')
+  const [campaignExcel, setCampaignExcel] = useState('')
+  const [preview, setPreview] = useState(null)
+  const [importing, setImporting] = useState(false)
+
+  // Web forms list inside modal
+  const [formsList, setFormsList] = useState([])
+  const [copiedCode, setCopiedCode] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      api('/api/s4/lead-options').then(setOpts).catch(() => {})
+      api('/api/s4/forms').then(d => setFormsList(d.items || [])).catch(() => {})
+      setM('')
+      setErr(false)
+    }
+  }, [isOpen])
+
+  function setFormF(k, v) { setForm(x => ({ ...x, [k]: v })) }
+
+  async function createLead(e) {
+    if (e) e.preventDefault()
+    if (!form.full_name?.trim()) {
+      setM('Vui lòng nhập Họ tên Lead.')
+      setErr(true)
+      return
+    }
+    if (!form.phone?.trim() && !form.email?.trim()) {
+      setM('Vui lòng nhập Số điện thoại hoặc Email.')
+      setErr(true)
+      return
+    }
+    setSubmitting(true)
+    setM('')
+    try {
+      await api('/api/s4/leads', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...form,
+          campaign_id: form.campaign_id ? Number(form.campaign_id) : null
+        })
+      })
+      window.dispatchEvent(new CustomEvent('crm:lead-created'))
+      onSuccess?.()
+      onClose?.()
+      setForm({
+        full_name: '',
+        phone: '',
+        email: '',
+        company: '',
+        interest: '',
+        source: 'danh_thiep',
+        source_detail: '',
+        industry: '',
+        company_size: '',
+        region: '',
+        interest_level: 'Cao',
+        campaign_id: ''
+      })
+      setShowDetails(false)
+    } catch (er) {
+      setM(msg(er))
+      setErr(true)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleKeyDown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      createLead()
+    }
+  }
+
+  async function handleExcelPreview() {
+    if (!file) return
+    setImporting(true)
+    setM('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('source_default', sourceExcel)
+      fd.append('campaign_id', campaignExcel)
+      const prevData = await upload('/api/s4/leads/import-preview', fd)
+      setPreview(prevData)
+      setM(`Đã kiểm tra: ${prevData.valid} dòng hợp lệ, ${prevData.invalid} dòng lỗi.`)
+      setErr(false)
+    } catch (er) {
+      setM(msg(er))
+      setErr(true)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleExcelConfirm() {
+    if (!preview?.token) return
+    setImporting(true)
+    try {
+      await api('/api/s4/leads/import-confirm', {
+        method: 'POST',
+        body: JSON.stringify({ token: preview.token, mode: 'valid_only' })
+      })
+      window.dispatchEvent(new CustomEvent('crm:lead-created'))
+      onSuccess?.()
+      onClose?.()
+    } catch (er) {
+      setM(msg(er))
+      setErr(true)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="s4-modal-backdrop" onClick={onClose} onKeyDown={handleKeyDown}>
+      <div className="s4-modal-card" onClick={e => e.stopPropagation()}>
+        <div className="s4-modal-head">
+          <div className="s4-modal-title-wrap">
+            <div className="s4-modal-icon">
+              <Zap size={20} />
+            </div>
+            <div>
+              <h3>Tạo Lead nhanh (Quick Create)</h3>
+              <p>Chọn Option 1 chạm · Ngắn gọn · Không cần tạo trang mới</p>
+            </div>
+          </div>
+          <button type="button" className="s4-modal-close" onClick={onClose} title="Đóng (Esc)">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="s4-modal-body">
+          <div className="s4-modal-tabs">
+            <button
+              type="button"
+              className={`s4-modal-tab-btn ${activeTab === 'single' ? 'active' : ''}`}
+              onClick={() => setActiveTab('single')}
+            >
+              <Zap size={15} /> 1. Tạo 1 Lead nhanh (5s)
+            </button>
+            <button
+              type="button"
+              className={`s4-modal-tab-btn ${activeTab === 'excel' ? 'active' : ''}`}
+              onClick={() => setActiveTab('excel')}
+            >
+              <FileSpreadsheet size={15} /> 2. Nhập file Excel nhanh
+            </button>
+            <button
+              type="button"
+              className={`s4-modal-tab-btn ${activeTab === 'form' ? 'active' : ''}`}
+              onClick={() => setActiveTab('form')}
+            >
+              <Link2 size={15} /> 3. Biểu mẫu Website
+            </button>
+          </div>
+
+          <Notice text={m} type={err ? 'err' : 'ok'} />
+
+          {activeTab === 'single' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="s4-grid cols-2" style={{ gap: '10px' }}>
+                <Field label="Họ tên Lead *">
+                  <input
+                    autoFocus
+                    placeholder="Nguyễn Văn A..."
+                    value={form.full_name}
+                    onChange={e => setFormF('full_name', e.target.value)}
+                  />
+                </Field>
+                <Field label="Số điện thoại *">
+                  <input
+                    placeholder="0912 345 678..."
+                    value={form.phone}
+                    onChange={e => setFormF('phone', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              {/* Lưới chọn Nguồn Lead (Option Card 1 chạm) */}
+              <div className="s4-opt-section">
+                <div className="s4-opt-label">
+                  <span>Nguồn Lead *</span>
+                  <small>Chọn 1 chạm</small>
+                </div>
+                <div className="s4-opt-grid">
+                  {QUICK_SOURCES.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`s4-opt-card ${form.source === s.id ? 'active' : ''}`}
+                      onClick={() => setFormF('source', s.id)}
+                    >
+                      <span className="s4-opt-card-icon">{s.icon}</span>
+                      <span className="s4-opt-card-text">{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mức độ quan tâm / Nhiệt độ Lead */}
+              <div className="s4-opt-section">
+                <div className="s4-opt-label">
+                  <span>Mức độ quan tâm / Nhiệt độ Lead *</span>
+                  <small>Hệ thống tự động tính điểm & phân bổ</small>
+                </div>
+                <div className="s4-interest-grid">
+                  {QUICK_INTERESTS.map(i => (
+                    <button
+                      key={i.id}
+                      type="button"
+                      className={`s4-interest-card ${i.cls} ${form.interest_level === i.id ? 'active' : ''}`}
+                      onClick={() => setFormF('interest_level', i.id)}
+                    >
+                      <span className="s4-interest-name">{i.label}</span>
+                      <span className="s4-interest-desc">{i.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nhu cầu tóm tắt */}
+              <Field label="Nhu cầu tóm tắt / Ghi chú nhanh">
+                <input
+                  placeholder="Ví dụ: Cần tư vấn gói CRM 15 người, gọi lại trong buổi sáng..."
+                  value={form.interest}
+                  onChange={e => setFormF('interest', e.target.value)}
+                />
+              </Field>
+
+              {/* Accordion mở rộng chi tiết khác */}
+              <div>
+                <button
+                  type="button"
+                  className="s4-details-toggle"
+                  onClick={() => setShowDetails(v => !v)}
+                >
+                  {showDetails ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  <span>{showDetails ? 'Thu gọn chi tiết nâng cao' : '+ Thêm chi tiết khác (Công ty, Email, Chiến dịch, Ngành nghề...)'}</span>
+                </button>
+
+                {showDetails && (
+                  <div className="s4-details-panel" style={{ marginTop: '8px' }}>
+                    <div className="s4-grid cols-2" style={{ gap: '10px' }}>
+                      <Field label="Tên công ty">
+                        <input
+                          placeholder="Công ty TNHH..."
+                          value={form.company}
+                          onChange={e => setFormF('company', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Email liên hệ">
+                        <input
+                          placeholder="email@example.com..."
+                          value={form.email}
+                          onChange={e => setFormF('email', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Gắn vào Chiến dịch">
+                        <select
+                          value={form.campaign_id}
+                          onChange={e => setFormF('campaign_id', e.target.value)}
+                        >
+                          <option value="">-- Không gắn chiến dịch --</option>
+                          {opts.campaigns?.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Ngành nghề">
+                        <input
+                          placeholder="Bất động sản, Bán lẻ, Sản xuất..."
+                          value={form.industry}
+                          onChange={e => setFormF('industry', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Quy mô nhân sự">
+                        <input
+                          placeholder="10-50 người, >100 người..."
+                          value={form.company_size}
+                          onChange={e => setFormF('company_size', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Khu vực">
+                        <input
+                          placeholder="Hà Nội, TP.HCM, Đà Nẵng..."
+                          value={form.region}
+                          onChange={e => setFormF('region', e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'excel' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: '#475569' }}>
+                  Kéo thả file Excel hoặc chọn file (.xlsx, .xls, .csv):
+                </span>
+                <a
+                  href={`${API_BASE}/api/s4/leads/import-template`}
+                  download="mau-nhap-lead.xlsx"
+                  className="s4-inline-btn"
+                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Download size={13} /> Tải tệp mẫu
+                </a>
+              </div>
+
+              <div className="s4-grid cols-2" style={{ gap: '10px' }}>
+                <Field label="Nguồn mặc định *">
+                  <select value={sourceExcel} onChange={e => setSourceExcel(e.target.value)}>
+                    <option value="danh_thiep">Danh thiếp / Gọi</option>
+                    <option value="website">Website</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="zalo">Zalo</option>
+                    <option value="hoi_thao">Hội thảo / Sự kiện</option>
+                    <option value="khac">Khác</option>
+                  </select>
+                </Field>
+                <Field label="Chiến dịch">
+                  <select value={campaignExcel} onChange={e => setCampaignExcel(e.target.value)}>
+                    <option value="">Không gắn</option>
+                    {opts.campaigns?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Field>
+              </div>
+
+              <div className="s4-upload-box" style={{ padding: '12px' }}>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={e => { setFile(e.target.files?.[0] || null); setPreview(null); }}
+                  style={{ fontSize: '13px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Btn kind="soft" onClick={handleExcelPreview} disabled={!file || importing}>
+                  <Search size={14} /> {importing ? 'Đang kiểm tra...' : 'Xem trước'}
+                </Btn>
+                {preview && (
+                  <Btn onClick={handleExcelConfirm} disabled={importing || preview.valid === 0}>
+                    <Check size={14} /> Nhập {preview.valid} dòng hợp lệ
+                  </Btn>
+                )}
+              </div>
+
+              {preview && (
+                <div style={{ fontSize: '12.5px', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <b>Kết quả kiểm tra:</b> {preview.valid} hợp lệ · {preview.invalid} lỗi
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'form' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <span style={{ fontSize: '13px', color: '#475569' }}>
+                Các biểu mẫu nhúng website tự động thu thập Lead:
+              </span>
+              {!formsList.length ? (
+                <Empty text="Chưa có biểu mẫu website nào. Hãy tạo tại mục Biểu mẫu nhúng." />
+              ) : (
+                formsList.map(formItem => (
+                  <div key={formItem.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', background: '#fafbfc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <b>{formItem.name}</b>
+                      <a
+                        href={`${API_BASE}/embed/${formItem.public_key}/page`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="s4-inline-btn"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Mở form demo ↗
+                      </a>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                      Nguồn: <b>{formItem.source_name}</b> · Đã thu thập: <b>{formItem.lead_count} Lead</b>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        readOnly
+                        value={`<script src="${API_BASE}/embed/${formItem.public_key}.js"></script>`}
+                        style={{ fontSize: '11px', background: '#fff' }}
+                      />
+                      <button
+                        type="button"
+                        className="s4-inline-btn"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(`<script src="${API_BASE}/embed/${formItem.public_key}.js"></script>`)
+                          setCopiedCode(true)
+                          setTimeout(() => setCopiedCode(false), 2000)
+                        }}
+                      >
+                        {copiedCode ? 'Đã chép!' : 'Sao chép'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {activeTab === 'single' && (
+          <div className="s4-modal-foot">
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+              Mẹo: Nhấn <b>Ctrl + Enter</b> để tạo ngay
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Btn kind="soft" onClick={onClose}>Hủy bỏ</Btn>
+              <Btn onClick={createLead} disabled={submitting}>
+                <Zap size={16} /> {submitting ? 'Đang tạo...' : '⚡ Tạo Lead ngay'}
+              </Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function RejectLeadModal({ isOpen, lead, onClose, onConfirm }) {
+  const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const QUICK_REASONS = [
+    '📞 Gọi 3 lần không liên lạc được',
+    '❌ Sai số điện thoại / Không đúng người',
+    '🚫 Không có nhu cầu sử dụng',
+    '🏢 Đã mua của đối thủ cạnh tranh',
+    '💰 Ngân sách chưa phù hợp'
+  ]
+
+  useEffect(() => {
+    if (isOpen) setReason(QUICK_REASONS[0])
+  }, [isOpen])
+
+  if (!isOpen || !lead) return null
+
+  async function submit() {
+    if (!reason.trim()) return
+    setSubmitting(true)
+    try {
+      await onConfirm(lead.id, reason)
+      onClose()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="s4-modal-backdrop" onClick={onClose}>
+      <div className="s4-modal-card sm" onClick={e => e.stopPropagation()}>
+        <div className="s4-modal-head">
+          <div className="s4-modal-title-wrap">
+            <div className="s4-modal-icon red">
+              <X size={20} />
+            </div>
+            <div>
+              <h3>Từ chối tiếp nhận Lead</h3>
+              <p>{lead.full_name} · {lead.phone || lead.email}</p>
+            </div>
+          </div>
+          <button type="button" className="s4-modal-close" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="s4-modal-body">
+          <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
+            Lead sẽ được chuyển về <b>Hàng chờ phân bổ</b> để trưởng nhóm phân cho nhân viên khác. Vui lòng chọn lý do:
+          </div>
+
+          <div className="s4-opt-section">
+            <div className="s4-opt-label"><span>Lý do nhanh:</span></div>
+            <div className="s4-tag-selector">
+              {QUICK_REASONS.map(r => (
+                <button
+                  key={r}
+                  type="button"
+                  className={`s4-tag-pill ${reason === r ? 'active' : ''}`}
+                  onClick={() => setReason(r)}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Field label="Chi tiết lý do từ chối:">
+            <input
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Nhập hoặc chỉnh sửa lý do từ chối..."
+            />
+          </Field>
+        </div>
+
+        <div className="s4-modal-foot">
+          <Btn kind="soft" onClick={onClose}>Hủy</Btn>
+          <button
+            type="button"
+            className="s4-btn"
+            style={{ background: '#ef4444', color: '#fff' }}
+            onClick={submit}
+            disabled={submitting || !reason.trim()}
+          >
+            {submitting ? 'Đang gửi...' : 'Xác nhận từ chối'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function ConvertLeadModal({ isOpen, lead, onClose, onConfirm }) {
+  const [val, setVal] = useState('50000000')
+  const [submitting, setSubmitting] = useState(false)
+  const QUICK_VALUES = [
+    { label: '20 Triệu', value: '20000000' },
+    { label: '50 Triệu', value: '50000000' },
+    { label: '100 Triệu', value: '100000000' },
+    { label: '200 Triệu', value: '200000000' }
+  ]
+
+  if (!isOpen || !lead) return null
+
+  async function submit() {
+    setSubmitting(true)
+    try {
+      await onConfirm(lead.id, Number(val) || 0)
+      onClose()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="s4-modal-backdrop" onClick={onClose}>
+      <div className="s4-modal-card sm" onClick={e => e.stopPropagation()}>
+        <div className="s4-modal-head">
+          <div className="s4-modal-title-wrap">
+            <div className="s4-modal-icon green">
+              <ArrowRightLeft size={20} />
+            </div>
+            <div>
+              <h3>Chuyển đổi thành Khách hàng & Cơ hội</h3>
+              <p>{lead.full_name} · {lead.company || 'Cá nhân'}</p>
+            </div>
+          </div>
+          <button type="button" className="s4-modal-close" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="s4-modal-body">
+          <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, background: '#f0fdf4', padding: '12px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+            🎉 <b>Hệ thống tự động tạo:</b>
+            <ul style={{ margin: '6px 0 0', paddingLeft: '20px' }}>
+              <li>Khách hàng doanh nghiệp: <b>{lead.company || lead.full_name}</b></li>
+              <li>Người liên hệ: <b>{lead.full_name}</b> ({lead.phone || lead.email})</li>
+              <li>Cơ hội bán hàng với giá trị dự kiến dưới đây.</li>
+            </ul>
+          </div>
+
+          <div className="s4-opt-section">
+            <div className="s4-opt-label"><span>Chọn nhanh giá trị dự kiến:</span></div>
+            <div className="s4-tag-selector">
+              {QUICK_VALUES.map(v => (
+                <button
+                  key={v.value}
+                  type="button"
+                  className={`s4-tag-pill ${val === v.value ? 'active' : ''}`}
+                  onClick={() => setVal(v.value)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Field label="Giá trị cơ hội dự kiến (VND):">
+            <input
+              type="number"
+              value={val}
+              onChange={e => setVal(e.target.value)}
+              placeholder="50000000"
+            />
+          </Field>
+          <div style={{ fontSize: '12.5px', color: '#4f46e5', fontWeight: 700 }}>
+            Tương đương: {Number(val || 0).toLocaleString('vi-VN')} ₫
+          </div>
+        </div>
+
+        <div className="s4-modal-foot">
+          <Btn kind="soft" onClick={onClose}>Hủy</Btn>
+          <Btn onClick={submit} disabled={submitting}>
+            {submitting ? 'Đang chuyển đổi...' : 'Chuyển đổi ngay'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function LeadPage({user}){
   const [data,setData]=useState({items:[],total:0});const [m,setM]=useState('');const [err,setErr]=useState(false);const [loadingLeads,setLoadingLeads]=useState(true)
   const [filters,setFilters]=useState({q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false})
   const [page,setPage]=useState(1)
   const [perPage,setPerPage]=useState(7)
   const [saved,setSaved]=useState([]);const [saveName,setSaveName]=useState('');const [opts,setOpts]=useState({users:[],campaigns:[]})
-  const [showAddForm,setShowAddForm]=useState(false)
+  const [showAddModal,setShowAddModal]=useState(false)
   const [showFilters,setShowFilters]=useState(false)
-  const [showDetails,setShowDetails]=useState(false)
-  const [form,setForm]=useState({full_name:'',email:'',phone:'',company:'',interest:'',source:'danh_thiep',source_detail:'',industry:'',company_size:'',region:'',interest_level:'Trung bình',campaign_id:''})
+  const [rejectLeadTarget,setRejectLeadTarget]=useState(null)
+  const [convertLeadTarget,setConvertLeadTarget]=useState(null)
+
   const roles=new Set(user?.roles||[]);const privileged=roles.has('ADMIN')||roles.has('DIRECTOR');const canCreateLead=privileged||roles.has('MARKETING');const canWorkLead=privileged||roles.has('SALES')||roles.has('TEAM_LEADER')
   const canHandleLead=x=>canWorkLead&&x.status!=='Đã chuyển đổi'&&(privileged||Number(x.assigned_to)===Number(user?.id))
   const hasActiveFilter = Boolean(filters.q || filters.status || filters.source || filters.classification || filters.assigned_to || filters.date_from || filters.date_to || filters.sla_breached_only)
+
   async function load(custom=filters, pageOverride=page, perPageOverride=perPage){
     setLoadingLeads(true);
     try{
@@ -176,39 +815,48 @@ export function LeadPage({user}){
       setLoadingLeads(false)
     }
   }
+
   async function loadSaved(){try{setSaved((await api('/api/s4/saved-filters')).items||[])}catch{}}
   async function loadOpts(){try{setOpts(await api('/api/s4/lead-options'))}catch{}}
-  useEffect(()=>{load();loadSaved();loadOpts()},[])
-  function setF(k,v){setFilters(x=>({...x,[k]:v}))} function setFormF(k,v){setForm(x=>({...x,[k]:v}))}
-  async function create(){
-    if (!form.full_name?.trim()) {
-      setM('Vui lòng nhập Họ tên Lead.');
-      setErr(true);
-      return;
-    }
-    if (!form.phone?.trim() && !form.email?.trim()) {
-      setM('Vui lòng nhập Số điện thoại hoặc Email.');
-      setErr(true);
-      return;
-    }
+
+  useEffect(()=>{
+    load();loadSaved();loadOpts();
+    const handleLeadCreated = () => { load(filters, 1, perPage); setPage(1); }
+    window.addEventListener('crm:lead-created', handleLeadCreated)
+    return () => window.removeEventListener('crm:lead-created', handleLeadCreated)
+  },[])
+
+  function setF(k,v){setFilters(x=>({...x,[k]:v}))}
+
+  async function accept(id){try{setM((await api(`/api/s4/leads/${id}/accept`,{method:'POST'})).message);load(filters,page,perPage)}catch(e){setM(msg(e));setErr(true)}}
+
+  async function handleRejectConfirm(id, reason){
     try{
-      await api('/api/s4/leads',{method:'POST',body:JSON.stringify({...form,campaign_id:form.campaign_id?Number(form.campaign_id):null})});
-      setM('Tạo lead thành công! Hệ thống đang tự động chấm điểm và phân bổ.');
+      const res = await api(`/api/s4/leads/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+      setM(res.message);
       setErr(false);
-      setForm({full_name:'',email:'',phone:'',company:'',interest:'',source:'danh_thiep',source_detail:'',industry:'',company_size:'',region:'',interest_level:'Trung bình',campaign_id:''});
-      setShowDetails(false);
-      setShowAddForm(false);
-      setTimeout(()=>{setPage(1);load(filters,1,perPage)},300);
+      load(filters, page, perPage);
     }catch(e){
       setM(msg(e));
       setErr(true);
     }
   }
-  async function accept(id){try{setM((await api(`/api/s4/leads/${id}/accept`,{method:'POST'})).message);load(filters,page,perPage)}catch(e){setM(msg(e));setErr(true)}}
-  async function reject(id){const reason=prompt('Nhập lý do từ chối lead:');if(!reason)return;try{setM((await api(`/api/s4/leads/${id}/reject`,{method:'POST',body:JSON.stringify({reason})})).message);load(filters,page,perPage)}catch(e){setM(msg(e));setErr(true)}}
-  async function convert(id){const v=prompt('Giá trị cơ hội dự kiến (VND):','50000000');if(v===null)return;try{const d=await api(`/api/s4/leads/${id}/convert`,{method:'POST',body:JSON.stringify({opportunity_value:Number(v)||0})});setM(`${d.message} Khách hàng #${d.customer_id}, cơ hội #${d.opportunity_id}.`);load(filters,page,perPage)}catch(e){setM(msg(e));setErr(true)}}
+
+  async function handleConvertConfirm(id, opportunityValue){
+    try{
+      const d = await api(`/api/s4/leads/${id}/convert`, { method: 'POST', body: JSON.stringify({ opportunity_value: opportunityValue }) });
+      setM(`${d.message} Khách hàng #${d.customer_id}, cơ hội #${d.opportunity_id}.`);
+      setErr(false);
+      load(filters, page, perPage);
+    }catch(e){
+      setM(msg(e));
+      setErr(true);
+    }
+  }
+
   async function saveFilter(){if(!saveName.trim())return setM('Hãy nhập tên bộ lọc.');try{await api('/api/s4/saved-filters',{method:'POST',body:JSON.stringify({name:saveName,criteria:filters})});setSaveName('');setM('Đã lưu bộ lọc.');loadSaved()}catch(e){setM(msg(e));setErr(true)}}
   async function delSaved(id){try{await api('/api/s4/saved-filters/'+id,{method:'DELETE'});loadSaved()}catch(e){setM(msg(e));setErr(true)}}
+
   return <div className="s4-page">
     <div className="s4-hero">
       <div>
@@ -217,8 +865,8 @@ export function LeadPage({user}){
       </div>
       <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
         {canCreateLead && (
-          <Btn onClick={()=>setShowAddForm(v=>!v)}>
-            <Plus size={16}/>{showAddForm ? 'Đóng tạo Lead' : '+ Thêm Lead nhanh'}
+          <Btn onClick={()=>setShowAddModal(true)}>
+            <Zap size={16}/>+ Thêm Lead nhanh
           </Btn>
         )}
         <Btn kind={showFilters ? 'primary' : 'soft'} onClick={()=>setShowFilters(v=>!v)}>
@@ -237,109 +885,33 @@ export function LeadPage({user}){
 
     <Notice text={m} type={err?'err':'ok'}/>
 
-    {/* Form Thêm Lead nhanh: Mặc định thu gọn, khi bấm vào nút '+ Thêm Lead nhanh' mới hiện lên */}
-    {canCreateLead && showAddForm && (
-      <Card
-        title="Thêm Lead nhanh"
-        subtitle="Nhập nhanh thông tin cơ bản; chọn nguồn & mức độ chỉ với 1 chạm."
-        icon={Plus}
-        actions={
-          <Btn kind="soft" onClick={()=>setShowAddForm(false)}>
-            <X size={15}/>Thu gọn
-          </Btn>
-        }
-      >
-        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div className="s4-grid cols-4" style={{gap:'10px'}}>
-            <Field label="Họ tên *">
-              <input placeholder="Họ và tên..." value={form.full_name} onChange={e=>setFormF('full_name',e.target.value)}/>
-            </Field>
-            <Field label="Số điện thoại *">
-              <input placeholder="0912 345 678..." value={form.phone} onChange={e=>setFormF('phone',e.target.value)}/>
-            </Field>
-            <Field label="Email">
-              <input placeholder="email@example.com..." value={form.email} onChange={e=>setFormF('email',e.target.value)}/>
-            </Field>
-            <Field label="Công ty">
-              <input placeholder="Tên công ty..." value={form.company} onChange={e=>setFormF('company',e.target.value)}/>
-            </Field>
-          </div>
+    {/* Modal Tạo Lead Nhanh - Không tạo trang mới, Option 1 chạm */}
+    <QuickLeadModal
+      isOpen={showAddModal}
+      onClose={()=>setShowAddModal(false)}
+      onSuccess={()=>{
+        setM('Tạo Lead thành công! Hệ thống đã tự động chấm điểm và phân bổ.');
+        setErr(false);
+        load(filters, 1, perPage);
+        setPage(1);
+      }}
+    />
 
-          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
-              <span style={{fontSize:'12.5px',fontWeight:700,color:'#475569',minWidth:'82px'}}>Nguồn Lead:</span>
-              <div className="s4-chips-wrap">
-                {QUICK_SOURCES.map(s => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`s4-chip-btn ${form.source === s.id ? 'active' : ''}`}
-                    onClick={() => setFormF('source', s.id)}
-                  >
-                    <span>{s.icon}</span>
-                    <span>{s.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+    {/* Modal Từ chối Lead với lý do nhanh */}
+    <RejectLeadModal
+      isOpen={!!rejectLeadTarget}
+      lead={rejectLeadTarget}
+      onClose={()=>setRejectLeadTarget(null)}
+      onConfirm={handleRejectConfirm}
+    />
 
-            <div style={{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
-              <span style={{fontSize:'12.5px',fontWeight:700,color:'#475569',minWidth:'82px'}}>Mức quan tâm:</span>
-              <div className="s4-chips-wrap">
-                {QUICK_INTERESTS.map(i => (
-                  <button
-                    key={i.id}
-                    type="button"
-                    className={`s4-chip-btn ${i.cls} ${form.interest_level === i.id ? `active ${i.cls}` : ''}`}
-                    onClick={() => setFormF('interest_level', i.id)}
-                  >
-                    <span>{i.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {showDetails && (
-            <div className="s4-grid cols-3" style={{paddingTop:'12px',borderTop:'1px dashed #e2e8f0'}}>
-              <Field label="Chiến dịch">
-                <select value={form.campaign_id} onChange={e=>setFormF('campaign_id',e.target.value)}>
-                  <option value="">Không gắn</option>
-                  {opts.campaigns.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Ngành nghề">
-                <input placeholder="Bất động sản, Bán lẻ..." value={form.industry} onChange={e=>setFormF('industry',e.target.value)}/>
-              </Field>
-              <Field label="Quy mô công ty">
-                <input placeholder="10-50 nhân sự..." value={form.company_size} onChange={e=>setFormF('company_size',e.target.value)}/>
-              </Field>
-              <Field label="Khu vực">
-                <input placeholder="Hà Nội, TP.HCM..." value={form.region} onChange={e=>setFormF('region',e.target.value)}/>
-              </Field>
-              <Field label="Nhu cầu cụ thể">
-                <input placeholder="Nhu cầu phần mềm CRM..." value={form.interest} onChange={e=>setFormF('interest',e.target.value)}/>
-              </Field>
-              <Field label="Chi tiết nguồn">
-                <input placeholder="Mã banner, người giới thiệu..." value={form.source_detail} onChange={e=>setFormF('source_detail',e.target.value)}/>
-              </Field>
-            </div>
-          )}
-
-          <div className="s4-actions" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'4px'}}>
-            <button
-              type="button"
-              className="s4-toggle-details-btn"
-              onClick={() => setShowDetails(v => !v)}
-            >
-              {showDetails ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
-              <span>{showDetails ? 'Thu gọn chi tiết' : '+ Nhập thêm chi tiết (Chiến dịch, ngành, nhu cầu...)'}</span>
-            </button>
-            <Btn onClick={create}><Zap size={16}/>Tạo Lead ngay</Btn>
-          </div>
-        </div>
-      </Card>
-    )}
+    {/* Modal Chuyển đổi Lead với giá trị cơ hội */}
+    <ConvertLeadModal
+      isOpen={!!convertLeadTarget}
+      lead={convertLeadTarget}
+      onClose={()=>setConvertLeadTarget(null)}
+      onConfirm={handleConvertConfirm}
+    />
 
     {/* Khối Bộ lọc Lead: Mặc định thu gọn, khi bấm vào nút 'Bộ lọc Lead' mới hiện lên */}
     {showFilters && (
@@ -373,16 +945,16 @@ export function LeadPage({user}){
       </Card>
     )}
 
-    {/* Bảng danh sách Lead cần xử lý: LUÔN NẰM NGAY TRÊN CÙNG ĐỂ THẤY NGAY DỮ LIỆU */}
+    {/* Bảng danh sách Lead: NẰM NGAY TRÊN CÙNG ĐỂ THẤY NGAY DỮ LIỆU */}
     <Card
       title="Lead cần xử lý"
       subtitle="Lead quá SLA được tô nổi bật; điểm chỉ dùng để sắp xếp ưu tiên, không tự động loại."
       icon={Users}
       actions={
         <div style={{display:'flex',gap:'8px'}}>
-          {!showAddForm && canCreateLead && (
-            <Btn kind="primary" onClick={()=>setShowAddForm(true)}>
-              <Plus size={14}/>Thêm Lead
+          {canCreateLead && (
+            <Btn kind="primary" onClick={()=>setShowAddModal(true)}>
+              <Zap size={14}/>+ Tạo Lead nhanh
             </Btn>
           )}
           {!showFilters && (
@@ -396,7 +968,7 @@ export function LeadPage({user}){
         </div>
       }
     >
-      {loadingLeads?<Empty text="Đang tải danh sách Lead..."/>:err?<Empty text="Không tải được danh sách Lead. Kiểm tra thông báo lỗi phía trên và kết nối Backend."/>:!data.items?.length?<div className="s4-empty"><p>Không có Lead phù hợp với bộ lọc hoặc quyền xem dữ liệu hiện tại.</p><Btn kind="soft" onClick={()=>{const empty={q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false};setFilters(empty);setPage(1);load(empty,1,perPage)}}><RefreshCw size={15}/>Xóa bộ lọc và tải lại</Btn></div>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Nguồn</th><th>Điểm</th><th>Trạng thái</th><th>Phụ trách</th><th>SLA</th><th>Thao tác</th></tr></thead><tbody>{data.items.map(x=><tr key={x.id} className={x.sla_status==='breached'?'s4-row-danger':''}><td><b>{x.full_name}</b><small>{x.company||'-'} · {x.phone||x.email||'-'}</small></td><td>{sourceVi[x.source]||x.source}</td><td><div className="s4-score"><b>{x.score}</b><Classification value={x.classification}/></div></td><td>{x.status}</td><td>{x.assigned_name||'Chưa phân'}</td><td><SLA value={x.sla_status}/></td><td>{canHandleLead(x)?<div className="s4-mini-actions">{x.status==='Đã phân công'&&<button type="button" title="Nhận Lead" onClick={()=>accept(x.id)}><UserCheck size={15}/></button>}<button type="button" title="Từ chối Lead" onClick={()=>reject(x.id)}><X size={15}/></button><button type="button" title="Chuyển thành khách hàng & cơ hội" onClick={()=>convert(x.id)}><ArrowRightLeft size={15}/></button></div>:<Badge tone={x.status==='Đã chuyển đổi'?'green':'gray'}>{x.status==='Đã chuyển đổi'?'Đã chuyển đổi':'Chỉ xem'}</Badge>}</td></tr>)}</tbody></table></div><Pagination currentPage={page} totalItems={data.total||0} pageSize={perPage} pageSizeOptions={[7, 15, 30, 50, 100]} onPageChange={p=>{setPage(p);load(filters,p,perPage)}} onPageSizeChange={ps=>{setPerPage(ps);setPage(1);load(filters,1,ps)}}/></>}
+      {loadingLeads?<Empty text="Đang tải danh sách Lead..."/>:err?<Empty text="Không tải được danh sách Lead. Kiểm tra thông báo lỗi phía trên và kết nối Backend."/>:!data.items?.length?<div className="s4-empty"><p>Không có Lead phù hợp với bộ lọc hoặc quyền xem dữ liệu hiện tại.</p><Btn kind="soft" onClick={()=>{const empty={q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false};setFilters(empty);setPage(1);load(empty,1,perPage)}}><RefreshCw size={15}/>Xóa bộ lọc và tải lại</Btn></div>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Nguồn</th><th>Điểm</th><th>Trạng thái</th><th>Phụ trách</th><th>SLA</th><th>Thao tác</th></tr></thead><tbody>{data.items.map(x=><tr key={x.id} className={x.sla_status==='breached'?'s4-row-danger':''}><td><b>{x.full_name}</b><small>{x.company||'-'} · {x.phone||x.email||'-'}</small></td><td>{sourceVi[x.source]||x.source}</td><td><div className="s4-score"><b>{x.score}</b><Classification value={x.classification}/></div></td><td>{x.status}</td><td>{x.assigned_name||'Chưa phân'}</td><td><SLA value={x.sla_status}/></td><td>{canHandleLead(x)?<div className="s4-mini-actions">{x.status==='Đã phân công'&&<button type="button" title="Nhận Lead" onClick={()=>accept(x.id)}><UserCheck size={15}/></button>}<button type="button" title="Từ chối Lead" onClick={()=>setRejectLeadTarget(x)}><X size={15}/></button><button type="button" title="Chuyển thành khách hàng & cơ hội" onClick={()=>setConvertLeadTarget(x)}><ArrowRightLeft size={15}/></button></div>:<Badge tone={x.status==='Đã chuyển đổi'?'green':'gray'}>{x.status==='Đã chuyển đổi'?'Đã chuyển đổi':'Chỉ xem'}</Badge>}</td></tr>)}</tbody></table></div><Pagination currentPage={page} totalItems={data.total||0} pageSize={perPage} pageSizeOptions={[7, 15, 30, 50, 100]} onPageChange={p=>{setPage(p);load(filters,p,perPage)}} onPageSizeChange={ps=>{setPerPage(ps);setPage(1);load(filters,1,ps)}}/></>}
     </Card>
   </div>
 }

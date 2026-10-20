@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { api, API_BASE } from './api'
-import { LeadPage, LeadImportPage, CampaignPage, LeadFormsPage, LeadDuplicatesPage, LeadScoringPage, LeadAssignmentPage } from './Sprint4'
+import { LeadPage, LeadImportPage, CampaignPage, LeadFormsPage, LeadDuplicatesPage, LeadScoringPage, LeadAssignmentPage, QuickLeadModal } from './Sprint4'
 import {
   LayoutDashboard, Users, LogOut, KeyRound, BriefcaseBusiness, Menu, X, Upload, BookOpen, Search,
   ShieldCheck, Package, GitBranch, ListTree, FileClock, UserCircle, HeartHandshake, Merge, Building2,
   Tags, Settings2, ContactRound, AlertCircle, CheckCircle2, FileSpreadsheet, Filter, Plus, Edit,
   Lock, Unlock, Download, RefreshCw, ChevronDown, ChevronRight, ChevronUp, TrendingUp, DollarSign,
   Award, Clock, CheckSquare, Calendar, PieChart, BarChart3, ArrowUpRight, ArrowDownRight, Activity, Target,
-  ArrowLeft, Eye
+  ArrowLeft, Eye, Zap
 } from 'lucide-react'
 
 const route = () => window.location.pathname
@@ -907,11 +907,15 @@ function GroupSubNav({ menu, currentPath, onNavigate }) {
 function Shell({ user, menu, onLogout, children }) {
   const [o, setO] = useState(false)
   const [alerts, setAlerts] = useState([])
+  const [showGlobalQuickLead, setShowGlobalQuickLead] = useState(false)
   useEffect(() => { api('/api/notifications').then(d => setAlerts(d.items || [])).catch(() => {}) }, [user?.id])
   const currentNav = menu.find(m => route() === m.path)
   const currentTitle = currentNav?.label || PATH_TITLES[route()] || (route() === '/' ? 'Tổng quan' : 'Trang không xác định')
   const unreadAlerts = alerts.filter(x => !x.is_read)
   const canOpenSupport = menu.some(x => x.path === '/support')
+  const roles = new Set(user?.roles || [])
+  const canCreateLead = roles.has('ADMIN') || roles.has('DIRECTOR') || roles.has('MARKETING')
+
 
   return (
     <div className="app">
@@ -952,6 +956,16 @@ function Shell({ user, menu, onLogout, children }) {
             </div>
           </div>
           <div className="header-right">
+            {canCreateLead && (
+              <button
+                type="button"
+                className="s4-header-quick-btn"
+                onClick={() => setShowGlobalQuickLead(true)}
+                title="Tạo nhanh 1 Lead mới ngay tại đây mà không cần chuyển trang"
+              >
+                <Zap size={14} /> + Tạo Lead nhanh
+              </button>
+            )}
             {unreadAlerts.length > 0 && canOpenSupport && <button type="button" className="secondary small-btn risk-alert-btn" onClick={() => go('/support')} title={unreadAlerts.map(x=>x.message).join('\n')}>⚠ {unreadAlerts.length} cảnh báo rủi ro</button>}
             <div className="header-user-pill">
               <span className="user-online-dot" title="Đang hoạt động"></span>
@@ -973,6 +987,11 @@ function Shell({ user, menu, onLogout, children }) {
           <GroupSubNav menu={menu} currentPath={route()} onNavigate={go} />
           {children}
         </div>
+        <QuickLeadModal
+          isOpen={showGlobalQuickLead}
+          onClose={() => setShowGlobalQuickLead(false)}
+          onSuccess={() => {}}
+        />
       </main>
     </div>
   )
