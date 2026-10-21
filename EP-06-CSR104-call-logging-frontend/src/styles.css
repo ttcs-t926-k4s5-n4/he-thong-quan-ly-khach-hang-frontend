@@ -346,3 +346,8 @@ h1 { margin-bottom: 8px; font: 800 clamp(27px, 3.3vw, 37px)/1.18 'Manrope', sans
 /* A11y: Visible keyboard focus ring */
 :focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 
+
+/* Micro-transitions for interactive badges */
+.badge, .tag { transition: transform 0.15s ease, background-color 0.2s ease; }
+.badge:hover { transform: translateY(-1px); }
+
