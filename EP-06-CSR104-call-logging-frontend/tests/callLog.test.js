@@ -251,3 +251,5 @@ test('sortCallLogs sắp xếp chính xác theo ngày tạo', () => { const item
 
 test('filterLogsByOutcome lọc đúng theo kết quả cuộc gọi', () => { const logs = [{ outcome: 'connected' }, { outcome: 'no_answer' }]; assert.equal(filterLogsByOutcome(logs, 'connected').length, 1); assert.equal(filterLogsByOutcome(logs, 'all').length, 2); });
 
+
+test('exportLogsToCsv cơ bản', () => { assert.equal(typeof exportLogsToCsv([]), 'string'); });
