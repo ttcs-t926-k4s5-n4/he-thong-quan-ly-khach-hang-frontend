@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { createHistoryEntries, filterHistory, formatFieldValue, formatDateTime, toCsv } from '../utils/history.js';
+import { SEED_HISTORY, SEED_OPPORTUNITIES } from '../data/seed.js';
+
+const before = { stage: 'Khám phá', value: 1000000, closeDate: '2026-11-01', owner: 'Lê Thu Hà' };
+const after = { stage: 'Đàm phán', value: 1250000, closeDate: '2026-11-10', owner: 'Nguyễn Minh Anh' };
+const entries = createHistoryEntries({ opportunityId: 'opp-test', before, after, actor: 'Nguyễn Minh Anh', note: 'Đã trao đổi', timestamp: '2026-10-17T03:04:00.000Z', idFactory: (() => { let n = 0; return () => ++n; })() });
+assert.equal(entries.length, 4, 'Mỗi trường được thay đổi phải tạo một dòng lịch sử');
+assert.deepEqual(entries.map((entry) => entry.field), ['stage', 'value', 'closeDate', 'owner']);
+assert.equal(entries[0].before, 'Khám phá');
+assert.equal(entries[0].after, 'Đàm phán');
+assert.equal(entries[0].actor, 'Nguyễn Minh Anh');
+assert.equal(createHistoryEntries({ opportunityId: 'opp-test', before, after: { ...before }, actor: 'Nguyễn Minh Anh' }).length, 0, 'Không đổi thì không tạo log');
+assert.match(formatFieldValue('value', 1250000), /1\.250\.000/);
+assert.equal(formatFieldValue('closeDate', '2026-11-10'), '10/11/2026');
+assert.match(formatDateTime('2026-10-17T03:04:00.000Z'), /\d{2}\/\d{2}\/\d{4} · \d{2}:\d{2}/);
+const filters = { query: 'An Phát', opportunityId: '', field: '', actor: '', from: '', to: '' };
+assert.ok(filterHistory(SEED_HISTORY, SEED_OPPORTUNITIES, filters).length > 0, 'Tìm kiếm theo công ty có kết quả');
+assert.ok(filterHistory(SEED_HISTORY, SEED_OPPORTUNITIES, { ...filters, query: '', field: 'value' }).every((entry) => entry.field === 'value'), 'Bộ lọc trường chỉ trả về đúng loại');
+assert.ok(filterHistory(SEED_HISTORY, SEED_OPPORTUNITIES, { ...filters, query: '', actor: 'Lê Thu Hà' }).every((entry) => entry.actor === 'Lê Thu Hà'), 'Bộ lọc thành viên chỉ trả về đúng người');
+assert.ok(filterHistory(SEED_HISTORY, SEED_OPPORTUNITIES, { ...filters, query: '', from: '2026-10-16', to: '2026-10-17' }).every((entry) => ['2026-10-16', '2026-10-17'].includes(new Date(entry.timestamp).getFullYear() + '-' + String(new Date(entry.timestamp).getMonth() + 1).padStart(2, '0') + '-' + String(new Date(entry.timestamp).getDate()).padStart(2, '0'))), 'Bộ lọc ngày dùng ngày lịch theo máy người dùng');
+const csv = toCsv(entries, [{ id: 'opp-test', name: 'Cơ hội mẫu', company: 'Công ty Sao Mai' }]);
+assert.ok(csv.startsWith('\uFEFF'));
+assert.match(csv, /Cơ hội mẫu/);
+assert.match(csv, /Nguyễn Minh Anh/);
+assert.match(csv, /1\.000\.000/);
+console.log('PASS: tạo lịch sử theo trường, bỏ qua khi không đổi, định dạng giá trị/ngày, tìm kiếm, lọc và xuất CSV.');

@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
 function notifySessionExpired(message){
   // Chỉ chuyển về đăng nhập nếu trước đó người dùng đã đăng nhập trong phiên tab này.
@@ -19,7 +19,17 @@ export async function api(path, options={}){
       ...options
     })
   } catch {
-    throw new Error('Không thể kết nối tới máy chủ. Hãy kiểm tra Backend đang chạy tại http://localhost:8000.')
+    // Retry with 127.0.0.1 if initial fetch failed
+    const altBase = BASE.includes('localhost') ? BASE.replace('localhost', '127.0.0.1') : BASE
+    try {
+      res = await fetch(altBase+path,{
+        credentials:'include',
+        headers:{'Content-Type':'application/json',...(options.headers||{})},
+        ...options
+      })
+    } catch {
+      throw new Error('Không thể kết nối tới máy chủ. Hãy kiểm tra Backend đang chạy tại http://127.0.0.1:8000.')
+    }
   }
 
   let data={}
