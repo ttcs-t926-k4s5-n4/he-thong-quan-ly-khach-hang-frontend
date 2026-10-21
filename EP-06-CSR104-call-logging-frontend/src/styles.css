@@ -342,3 +342,7 @@ h1 { margin-bottom: 8px; font: 800 clamp(27px, 3.3vw, 37px)/1.18 'Manrope', sans
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 .brand-name > strong { font: inherit; line-height: 1; }
+
+/* A11y: Visible keyboard focus ring */
+:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
