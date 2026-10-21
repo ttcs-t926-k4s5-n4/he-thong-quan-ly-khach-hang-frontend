@@ -132,3 +132,5 @@ export const exportLogsToCsv = (logs) => logs.map(l => l.id + ',' + (l.outcome |
 export const isCallOverdue = (callbackAt, ref = new Date()) => Boolean(callbackAt && new Date(callbackAt) < new Date(ref));
 
 export const getOutcomeColor = (o) => ({ connected: 'success', callback: 'warning', meeting: 'primary' }[o] || 'neutral');
+
+export const formatPhoneNumber = (p) => p ? String(p).replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3') : '';
