@@ -99,3 +99,62 @@ test('Mốc gọi lại mặc định là 9 giờ sáng ngày kế tiếp', () =
 test('Định dạng giá trị tiền tệ Việt Nam', () => {
   assert.match(formatVnd(1000000), /1\.000\.000/);
 });
+test('Từ chối thời gian gọi lại không hợp lệ', () => {
+  assert.throws(
+    () =>
+      createCallLog(
+        baseInput({ callbackAt: 'not-a-valid-date' }),
+        { now },
+      ),
+    /thời gian gọi lại không hợp lệ/i,
+  );
+});
+
+test('Từ chối lịch gọi lại trong quá khứ khi đã bật lịch', () => {
+  assert.throws(
+    () =>
+      createCallLog(
+        baseInput({
+          outcome: 'connected',
+          callbackAt: '2026-10-18T09:00:00.000Z',
+        }),
+        { now },
+      ),
+    /hiện tại hoặc tương lai/i,
+  );
+});
+
+test('Tìm kiếm cuộc gọi theo số điện thoại, cơ hội và người tạo', () => {
+  const log = {
+    phone: '0901',
+    opportunityName: 'Hợp đồng Pro',
+    createdBy: 'Phạm Ngọc Anh',
+  };
+
+  assert.equal(matchesCallLogSearch(log, '0901'), true);
+  assert.equal(matchesCallLogSearch(log, 'hop dong'), true);
+  assert.equal(matchesCallLogSearch(log, 'ngoc anh'), true);
+  assert.equal(matchesCallLogSearch(log, 'khach hang khac'), false);
+});
+
+test('Thống kê bỏ qua ngày tạo và lịch gọi lại không hợp lệ', () => {
+  const logs = [
+    {
+      createdAt: 'invalid-date',
+      outcome: 'connected',
+      callbackAt: 'invalid-date',
+    },
+    {
+      createdAt: now.toISOString(),
+      outcome: 'connected',
+      callbackAt: 'invalid-date',
+    },
+  ];
+
+  assert.deepEqual(getCallSummary(logs, now), {
+    callsToday: 1,
+    connectedToday: 1,
+    callbacksDue: 0,
+    overdueCallbacks: 0,
+  });
+});
