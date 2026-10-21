@@ -118,7 +118,7 @@ export function getCallSummary(logs = [], now = new Date()) {
 export const sanitizeText = (str) => typeof str === 'string' ? str.trim().replace(/[<>]/g, '') : '';
 
 
-export const formatCallDuration = (sec) => { const s = Number(sec) || 0; const m = Math.floor(s / 60); const r = s % 60; return m > 0 ? ${m}m s : ${r}s; };
+export const formatCallDuration = (sec) => { const s = Number(sec) || 0; const m = Math.floor(s / 60); const r = s % 60; return m > 0 ? `${m}m ${r}s` : `${r}s`; };
 
 
 export const sortCallLogs = (logs, key = 'createdAt', asc = false) => [...logs].sort((a, b) => asc ? (a[key] > b[key] ? 1 : -1) : (a[key] < b[key] ? 1 : -1));

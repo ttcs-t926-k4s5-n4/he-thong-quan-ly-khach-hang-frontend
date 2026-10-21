@@ -8,6 +8,15 @@ import {
   getDefaultCallbackDateTime,
   matchesCallLogSearch,
   normalizeSearchText,
+  sanitizeText,
+  formatCallDuration,
+  sortCallLogs,
+  filterLogsByOutcome,
+  exportLogsToCsv,
+  isCallOverdue,
+  getOutcomeColor,
+  formatPhoneNumber,
+  createDebounce,
 } from '../src/lib/callLog.js';
 import {
   readStoredCallLogs,
