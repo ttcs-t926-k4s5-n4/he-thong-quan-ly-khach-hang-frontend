@@ -130,3 +130,5 @@ export const filterLogsByOutcome = (logs, outcome) => !outcome || outcome === 'a
 export const exportLogsToCsv = (logs) => logs.map(l => l.id + ',' + (l.outcome || '')).join('\n');
 
 export const isCallOverdue = (callbackAt, ref = new Date()) => Boolean(callbackAt && new Date(callbackAt) < new Date(ref));
+
+export const getOutcomeColor = (o) => ({ connected: 'success', callback: 'warning', meeting: 'primary' }[o] || 'neutral');
