@@ -245,3 +245,6 @@ test('sanitizeText loại bỏ ký tự HTML nguy hiểm', () => { assert.equal(
 
 test('formatCallDuration chuyển giây sang định dạng phút giây', () => { assert.equal(formatCallDuration(125), '2m 5s'); assert.equal(formatCallDuration(45), '45s'); });
 
+
+test('sortCallLogs sắp xếp chính xác theo ngày tạo', () => { const items = [{ createdAt: '2026-10-01' }, { createdAt: '2026-10-05' }]; const sorted = sortCallLogs(items, 'createdAt', false); assert.equal(sorted[0].createdAt, '2026-10-05'); });
+
