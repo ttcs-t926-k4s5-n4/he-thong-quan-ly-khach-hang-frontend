@@ -49,3 +49,7 @@ Các kiểm thử logic sử dụng `node:test` tích hợp sẵn nên không c�
 - sortCallLogs(logs, key, asc): Sắp xếp cuộc gọi đa tiêu chí.
 - sanitizeText(str): Chuẩn hóa và làm sạch chuỗi văn bản.
 
+
+### Chính sách lưu trữ dữ liệu
+- Dự phòng an toàn khi localStorage bị khoá hoặc đầy dung lượng.
+
