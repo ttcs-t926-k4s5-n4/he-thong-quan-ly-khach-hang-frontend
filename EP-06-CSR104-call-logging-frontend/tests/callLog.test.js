@@ -239,3 +239,6 @@ test('Dùng khách hàng mặc định khi ID đã lưu không tồn tại', () 
     'cus-001',
   );
 });
+
+test('sanitizeText loại bỏ ký tự HTML nguy hiểm', () => { assert.equal(sanitizeText('  <b>test</b> '), 'btest/b'); });
+
