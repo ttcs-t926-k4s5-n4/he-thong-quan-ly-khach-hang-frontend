@@ -255,3 +255,5 @@ test('filterLogsByOutcome lọc đúng theo kết quả cuộc gọi', () => { c
 test('exportLogsToCsv cơ bản', () => { assert.equal(typeof exportLogsToCsv([]), 'string'); });
 
 test('isCallOverdue kiểm tra ngày hẹn', () => { assert.equal(isCallOverdue('2020-01-01'), true); assert.equal(isCallOverdue(null), false); });
+
+test('getOutcomeColor ánh xạ màu sắc', () => { assert.equal(getOutcomeColor('connected'), 'success'); assert.equal(getOutcomeColor('other'), 'neutral'); });
