@@ -248,3 +248,6 @@ test('formatCallDuration chuyển giây sang định dạng phút giây', () => 
 
 test('sortCallLogs sắp xếp chính xác theo ngày tạo', () => { const items = [{ createdAt: '2026-10-01' }, { createdAt: '2026-10-05' }]; const sorted = sortCallLogs(items, 'createdAt', false); assert.equal(sorted[0].createdAt, '2026-10-05'); });
 
+
+test('filterLogsByOutcome lọc đúng theo kết quả cuộc gọi', () => { const logs = [{ outcome: 'connected' }, { outcome: 'no_answer' }]; assert.equal(filterLogsByOutcome(logs, 'connected').length, 1); assert.equal(filterLogsByOutcome(logs, 'all').length, 2); });
+
