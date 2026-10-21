@@ -9,7 +9,10 @@ import {
   matchesCallLogSearch,
   normalizeSearchText,
 } from '../src/lib/callLog.js';
-
+import {
+  readStoredCallLogs,
+  readStoredCustomerId,
+} from '../src/lib/storage.js';
 const now = new Date('2026-10-18T10:00:00.000Z');
 const customers = [
   { id: 'c1', name: 'Nguyễn Minh Anh', company: 'An Phát Logistics', phone: '0901' },
@@ -98,4 +101,141 @@ test('Mốc gọi lại mặc định là 9 giờ sáng ngày kế tiếp', () =
 
 test('Định dạng giá trị tiền tệ Việt Nam', () => {
   assert.match(formatVnd(1000000), /1\.000\.000/);
+});
+test('Từ chối thời gian gọi lại không hợp lệ', () => {
+  assert.throws(
+    () =>
+      createCallLog(
+        baseInput({ callbackAt: 'not-a-valid-date' }),
+        { now },
+      ),
+    /thời gian gọi lại không hợp lệ/i,
+  );
+});
+
+test('Từ chối lịch gọi lại trong quá khứ khi đã bật lịch', () => {
+  assert.throws(
+    () =>
+      createCallLog(
+        baseInput({
+          outcome: 'connected',
+          callbackAt: '2026-10-18T09:00:00.000Z',
+        }),
+        { now },
+      ),
+    /hiện tại hoặc tương lai/i,
+  );
+});
+
+test('Tìm kiếm cuộc gọi theo số điện thoại, cơ hội và người tạo', () => {
+  const log = {
+    phone: '0901',
+    opportunityName: 'Hợp đồng Pro',
+    createdBy: 'Phạm Ngọc Anh',
+  };
+
+  assert.equal(matchesCallLogSearch(log, '0901'), true);
+  assert.equal(matchesCallLogSearch(log, 'hop dong'), true);
+  assert.equal(matchesCallLogSearch(log, 'ngoc anh'), true);
+  assert.equal(matchesCallLogSearch(log, 'khach hang khac'), false);
+});
+
+test('Thống kê bỏ qua ngày tạo và lịch gọi lại không hợp lệ', () => {
+  const logs = [
+    {
+      createdAt: 'invalid-date',
+      outcome: 'connected',
+      callbackAt: 'invalid-date',
+    },
+    {
+      createdAt: now.toISOString(),
+      outcome: 'connected',
+      callbackAt: 'invalid-date',
+    },
+  ];
+
+  assert.deepEqual(getCallSummary(logs, now), {
+    callsToday: 1,
+    connectedToday: 1,
+    callbacksDue: 0,
+    overdueCallbacks: 0,
+  });
+});
+test('Dùng dữ liệu mẫu khi JSON cuộc gọi bị lỗi', () => {
+  const fallback = [{ id: 'demo-call' }];
+  const storage = { getItem: () => '{invalid-json' };
+
+  assert.deepEqual(
+    readStoredCallLogs(storage, 'calls', fallback),
+    fallback,
+  );
+});
+
+test('Dùng dữ liệu mẫu khi dữ liệu cuộc gọi không phải mảng', () => {
+  const fallback = [{ id: 'demo-call' }];
+  const storage = {
+    getItem: () => JSON.stringify({ id: 'invalid' }),
+  };
+
+  assert.deepEqual(
+    readStoredCallLogs(storage, 'calls', fallback),
+    fallback,
+  );
+});
+
+test('Bỏ qua phần tử không hợp lệ trong lịch sử cuộc gọi', () => {
+  const storage = {
+    getItem: () =>
+      JSON.stringify([
+        { id: 'call-1' },
+        null,
+        'invalid',
+        ['nested-array'],
+        { id: 'call-2' },
+      ]),
+  };
+
+  assert.deepEqual(
+    readStoredCallLogs(storage, 'calls', []),
+    [{ id: 'call-1' }, { id: 'call-2' }],
+  );
+});
+
+test('Khôi phục khách hàng có ID hợp lệ đã lưu', () => {
+  const customers = [
+    { id: 'cus-001' },
+    { id: 'cus-002' },
+  ];
+
+  const storage = {
+    getItem: () => JSON.stringify('cus-002'),
+  };
+
+  assert.equal(
+    readStoredCustomerId(
+      storage,
+      'customer',
+      'cus-001',
+      customers,
+    ),
+    'cus-002',
+  );
+});
+
+test('Dùng khách hàng mặc định khi ID đã lưu không tồn tại', () => {
+  const customers = [{ id: 'cus-001' }];
+
+  const storage = {
+    getItem: () => JSON.stringify('cus-unknown'),
+  };
+
+  assert.equal(
+    readStoredCustomerId(
+      storage,
+      'customer',
+      'cus-001',
+      customers,
+    ),
+    'cus-001',
+  );
 });

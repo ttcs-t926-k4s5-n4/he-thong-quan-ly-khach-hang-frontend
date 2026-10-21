@@ -9,7 +9,11 @@ import {
   createCallLog, findLatestOpenOpportunity, formatDateTime, formatVnd,
   getCallSummary, getDefaultCallbackDateTime, matchesCallLogSearch, toLocalDateTimeInput,
 } from './lib/callLog.js';
-
+import {
+  getSafeLocalStorage,
+  readStoredCallLogs,
+  readStoredCustomerId,
+} from './lib/storage.js';
 const STORAGE_KEYS = {
   calls: 'ep06-csr104-call-logs-v1',
   customer: 'ep06-csr104-selected-customer-v1',
@@ -24,14 +28,7 @@ const outcomeIcons = {
   not_interested: CircleMinus,
 };
 
-function readStoredJson(key, fallback) {
-  try {
-    const value = window.localStorage.getItem(key);
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
-}
+
 
 function getOutcomeMeta(outcomeId) {
   return CALL_OUTCOMES.find((item) => item.id === outcomeId) ?? CALL_OUTCOMES[0];
@@ -75,8 +72,21 @@ function StatCard({ icon: Icon, label, value, foot, tone = 'violet' }) {
 }
 
 function App() {
-  const [calls, setCalls] = useState(() => readStoredJson(STORAGE_KEYS.calls, demoCallLogs));
-  const [selectedCustomerId, setSelectedCustomerId] = useState(() => readStoredJson(STORAGE_KEYS.customer, 'cus-001'));
+  const [calls, setCalls] = useState(() =>
+  readStoredCallLogs(
+    getSafeLocalStorage(),
+    STORAGE_KEYS.calls,
+    demoCallLogs,
+  ),
+);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(() =>
+  readStoredCustomerId(
+    getSafeLocalStorage(),
+    STORAGE_KEYS.customer,
+    'cus-001',
+    demoCustomers,
+  ),
+);
   const [selectedOutcome, setSelectedOutcome] = useState('');
   const [note, setNote] = useState('');
   const [showSchedule, setShowSchedule] = useState(false);
