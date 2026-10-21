@@ -47,3 +47,5 @@ export function readStoredCustomerId(
     ? stored
     : fallback;
 }
+export const isLocalStorageAvailable = () => { try { const k = '__chk__'; window.localStorage.setItem(k, k); window.localStorage.removeItem(k); return true; } catch { return false; } };
+
