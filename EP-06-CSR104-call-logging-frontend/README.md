@@ -41,3 +41,6 @@ Các kiểm thử logic sử dụng `node:test` tích hợp sẵn nên không c�
 ## Ghi chú về dữ liệu
 
 Đây là frontend demo. Cuộc gọi được lưu cục bộ trong trình duyệt và không đồng bộ giữa thiết bị. Danh sách khách hàng/cơ hội là dữ liệu mẫu; khi tích hợp vào CRM, hãy lấy dữ liệu từ API và xử lý quyền/lưu nhật ký ở backend.
+
+<!-- Architecture: Modal -> Form -> Validation -> Storage Sync -> Event Notification -->
+
