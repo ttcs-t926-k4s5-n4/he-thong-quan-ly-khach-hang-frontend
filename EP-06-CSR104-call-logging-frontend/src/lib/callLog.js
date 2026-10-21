@@ -114,3 +114,6 @@ export function getCallSummary(logs = [], now = new Date()) {
     overdueCallbacks: overdueCallbacks.length,
   };
 }
+
+export const sanitizeText = (str) => typeof str === 'string' ? str.trim().replace(/[<>]/g, '') : '';
+
