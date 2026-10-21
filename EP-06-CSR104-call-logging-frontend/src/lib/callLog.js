@@ -126,3 +126,5 @@ export const sortCallLogs = (logs, key = 'createdAt', asc = false) => [...logs].
 
 export const filterLogsByOutcome = (logs, outcome) => !outcome || outcome === 'all' ? logs : logs.filter(l => l.outcome === outcome);
 
+
+export const exportLogsToCsv = (logs) => logs.map(l => l.id + ',' + (l.outcome || '')).join('\n');
