@@ -351,3 +351,8 @@ h1 { margin-bottom: 8px; font: 800 clamp(27px, 3.3vw, 37px)/1.18 'Manrope', sans
 .badge, .tag { transition: transform 0.15s ease, background-color 0.2s ease; }
 .badge:hover { transform: translateY(-1px); }
 
+
+/* Custom sleek scrollbar for call history */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 3px; }
+
