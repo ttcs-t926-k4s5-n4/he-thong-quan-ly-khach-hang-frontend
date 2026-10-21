@@ -259,3 +259,5 @@ test('isCallOverdue kiểm tra ngày hẹn', () => { assert.equal(isCallOverdue(
 test('getOutcomeColor ánh xạ màu sắc', () => { assert.equal(getOutcomeColor('connected'), 'success'); assert.equal(getOutcomeColor('other'), 'neutral'); });
 
 test('formatPhoneNumber định dạng số', () => { assert.equal(formatPhoneNumber('0912345678'), '0912 345 678'); });
+
+test('createDebounce debounce hoạt động', async () => { let c = 0; const d = createDebounce(() => { c++; }, 30); d(); await new Promise(r => setTimeout(r, 50)); assert.equal(c, 1); });
