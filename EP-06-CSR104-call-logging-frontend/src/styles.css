@@ -359,3 +359,6 @@ h1 { margin-bottom: 8px; font: 800 clamp(27px, 3.3vw, 37px)/1.18 'Manrope', sans
 
 /* Modal backdrop transition */
 .modal-backdrop-smooth { backdrop-filter: blur(4px); transition: backdrop-filter 0.2s ease; }
+
+/* Mobile breakpoint optimization */
+@media (max-width: 640px) { .mobile-compact { display: block; width: 100%; } }
