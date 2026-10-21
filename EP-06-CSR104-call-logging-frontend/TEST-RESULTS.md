@@ -30,3 +30,5 @@ Chưa xác minh production build bằng Vite trong môi trường tạo project 
 ## Lưu ý
 
 Nhật ký và khách hàng đang chọn được lưu trong `localStorage`; chưa có backend/API hoặc đồng bộ với CRM thật.
+
+- Bổ sung kiểm thử đơn vị tự động mở rộng cho EP-06 CSR104.
