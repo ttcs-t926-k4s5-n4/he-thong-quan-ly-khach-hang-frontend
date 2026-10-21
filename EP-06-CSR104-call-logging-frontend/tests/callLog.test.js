@@ -253,3 +253,5 @@ test('filterLogsByOutcome lọc đúng theo kết quả cuộc gọi', () => { c
 
 
 test('exportLogsToCsv cơ bản', () => { assert.equal(typeof exportLogsToCsv([]), 'string'); });
+
+test('isCallOverdue kiểm tra ngày hẹn', () => { assert.equal(isCallOverdue('2020-01-01'), true); assert.equal(isCallOverdue(null), false); });
