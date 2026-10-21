@@ -134,3 +134,5 @@ export const isCallOverdue = (callbackAt, ref = new Date()) => Boolean(callbackA
 export const getOutcomeColor = (o) => ({ connected: 'success', callback: 'warning', meeting: 'primary' }[o] || 'neutral');
 
 export const formatPhoneNumber = (p) => p ? String(p).replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3') : '';
+
+export const createDebounce = (fn, ms = 200) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
