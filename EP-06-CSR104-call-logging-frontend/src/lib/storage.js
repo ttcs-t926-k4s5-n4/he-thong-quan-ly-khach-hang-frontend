@@ -49,3 +49,6 @@ export function readStoredCustomerId(
 }
 export const isLocalStorageAvailable = () => { try { const k = '__chk__'; window.localStorage.setItem(k, k); window.localStorage.removeItem(k); return true; } catch { return false; } };
 
+
+export const safeJsonParse = (str, fallback) => { try { return JSON.parse(str) ?? fallback; } catch { return fallback; } };
+
