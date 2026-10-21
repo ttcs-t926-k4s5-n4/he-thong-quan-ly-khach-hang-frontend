@@ -362,3 +362,6 @@ h1 { margin-bottom: 8px; font: 800 clamp(27px, 3.3vw, 37px)/1.18 'Manrope', sans
 
 /* Mobile breakpoint optimization */
 @media (max-width: 640px) { .mobile-compact { display: block; width: 100%; } }
+
+/* Overdue pulse */
+.pulse-overdue { animation: pulse 1.5s infinite; }
