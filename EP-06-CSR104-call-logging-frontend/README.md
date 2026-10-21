@@ -53,3 +53,5 @@ Các kiểm thử logic sử dụng `node:test` tích hợp sẵn nên không c�
 ### Chính sách lưu trữ dữ liệu
 - Dự phòng an toàn khi localStorage bị khoá hoặc đầy dung lượng.
 
+
+- `exportLogsToCsv`: Hỗ trợ trích xuất lịch sử cuộc gọi.
