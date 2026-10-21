@@ -60,3 +60,6 @@ Các kiểm thử logic sử dụng `node:test` tích hợp sẵn nên không c�
 
 ### Phím tắt hệ thống
 - `Esc`: Thoát cửa sổ popup nhanh.
+
+---
+*Cập nhật hoàn thiện tài liệu module Sprint 4 bởi dtc245200307-VuNhatPhong.*
