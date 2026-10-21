@@ -44,3 +44,8 @@ Các kiểm thử logic sử dụng `node:test` tích hợp sẵn nên không c�
 
 <!-- Architecture: Modal -> Form -> Validation -> Storage Sync -> Event Notification -->
 
+
+### Tiện ích mở rộng
+- sortCallLogs(logs, key, asc): Sắp xếp cuộc gọi đa tiêu chí.
+- sanitizeText(str): Chuẩn hóa và làm sạch chuỗi văn bản.
+
