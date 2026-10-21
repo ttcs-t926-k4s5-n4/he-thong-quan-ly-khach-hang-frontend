@@ -123,3 +123,6 @@ export const formatCallDuration = (sec) => { const s = Number(sec) || 0; const m
 
 export const sortCallLogs = (logs, key = 'createdAt', asc = false) => [...logs].sort((a, b) => asc ? (a[key] > b[key] ? 1 : -1) : (a[key] < b[key] ? 1 : -1));
 
+
+export const filterLogsByOutcome = (logs, outcome) => !outcome || outcome === 'all' ? logs : logs.filter(l => l.outcome === outcome);
+
