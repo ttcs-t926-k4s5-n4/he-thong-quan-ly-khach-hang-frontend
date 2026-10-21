@@ -52,3 +52,5 @@ export const isLocalStorageAvailable = () => { try { const k = '__chk__'; window
 
 export const safeJsonParse = (str, fallback) => { try { return JSON.parse(str) ?? fallback; } catch { return fallback; } };
 
+
+export const getStorageQuotaEstimate = async () => ({ quota: 5242880, usage: 0 });
