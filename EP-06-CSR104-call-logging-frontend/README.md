@@ -55,3 +55,5 @@ Các kiểm thử logic sử dụng `node:test` tích hợp sẵn nên không c�
 
 
 - `exportLogsToCsv`: Hỗ trợ trích xuất lịch sử cuộc gọi.
+
+- `getOutcomeColor`: Ánh xạ mã màu trực quan cho trạng thái.
