@@ -117,3 +117,6 @@ export function getCallSummary(logs = [], now = new Date()) {
 
 export const sanitizeText = (str) => typeof str === 'string' ? str.trim().replace(/[<>]/g, '') : '';
 
+
+export const formatCallDuration = (sec) => { const s = Number(sec) || 0; const m = Math.floor(s / 60); const r = s % 60; return m > 0 ? ${m}m s : ${r}s; };
+
