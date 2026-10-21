@@ -54,3 +54,5 @@ export const safeJsonParse = (str, fallback) => { try { return JSON.parse(str) ?
 
 
 export const getStorageQuotaEstimate = async () => ({ quota: 5242880, usage: 0 });
+
+export const pruneStoredLogs = (list, max = 100) => Array.isArray(list) ? list.slice(0, max) : [];
