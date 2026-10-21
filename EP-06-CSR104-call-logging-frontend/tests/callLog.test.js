@@ -242,3 +242,6 @@ test('Dùng khách hàng mặc định khi ID đã lưu không tồn tại', () 
 
 test('sanitizeText loại bỏ ký tự HTML nguy hiểm', () => { assert.equal(sanitizeText('  <b>test</b> '), 'btest/b'); });
 
+
+test('formatCallDuration chuyển giây sang định dạng phút giây', () => { assert.equal(formatCallDuration(125), '2m 5s'); assert.equal(formatCallDuration(45), '45s'); });
+
