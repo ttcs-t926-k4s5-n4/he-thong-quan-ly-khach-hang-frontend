@@ -12,7 +12,16 @@ import {
   transferOwnership,
 } from './shareLogic.js';
 
-const base = () => structuredClone(INITIAL_OPPORTUNITIES[0]);
+const base = () => {
+  const opp = structuredClone(INITIAL_OPPORTUNITIES[0]);
+  opp.audit = [
+    { id: 'log-142-1', type: 'created', actorId: 'u-phong', createdAt: '2026-10-10T08:45:00.000Z', summary: 'Tạo cơ hội và thiết lập Phạm Minh Phong làm chủ sở hữu.' },
+    { id: 'log-142-2', type: 'member_added', actorId: 'u-phong', createdAt: '2026-10-12T14:20:00.000Z', summary: 'Chia sẻ cơ hội với Trần Mỹ Linh, Nguyễn Quang Minh.' },
+    { id: 'log-142-3', type: 'activity_logged', actorId: 'u-linh', createdAt: '2026-10-15T15:10:00.000Z', summary: 'Ghi hoạt động: Trao đổi ngân sách với khách hàng.' },
+    { id: 'log-142-4', type: 'activity_logged', actorId: 'u-minh', createdAt: '2026-10-16T10:40:00.000Z', summary: 'Ghi hoạt động: Họp rà soát yêu cầu.' },
+  ];
+  return opp;
+};
 const now = '2026-10-17T14:30:00.000Z';
 
 test('xác định vai trò owner, member và người chưa được chia sẻ', () => {
