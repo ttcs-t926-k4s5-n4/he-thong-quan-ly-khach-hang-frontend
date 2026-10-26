@@ -68,7 +68,7 @@ Kết quả được ghi nhận từ lần chạy tự động bằng script [ch
 
 | STT | Phân hệ (Thư mục) | Cổng Preview | Đóng gói (Build) | Chuẩn hóa (Lint) | Kiểm thử đơn vị (Unit Test) | Giao diện (UI Render) | Tích hợp Backend | Ghi chú & Đánh giá QA |
 |:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| 1 | `Root CRM App` (`qa-crm-frontend`) | 5173 | **PASS** (Exit 0, 0.86s) | **FAIL** (Exit 1, 46 errors) | N/A *(Không có script test)* | **PASS** | **BLOCKED** | Đã sửa BUG-01. Build và Preview thành công. Lint có config Flat Config nhưng tồn đọng code cũ. |
+| 1 | `Root CRM App` (`qa-crm-frontend`) | 5173 | **PASS** (Exit 0, 0.86s) | **PASS** (Exit 0, 0 lỗi, 0 cảnh báo) | N/A *(Không có script test)* | **PASS** | **BLOCKED** | Đã sửa BUG-01, BUG-02 (xử lý 46 lỗi lint theo chuẩn react-hooks), BUG-07. Lint và Build 100% sạch. |
 | 2 | `crm-customer-management` | 5174 | **PASS** (Exit 0, 0.92s) | **PASS** (Exit 0, 0 lỗi) | N/A *(Không có script test)* | **PASS** | **BLOCKED** | Đã sửa BUG-06 (loại bỏ `useEffect` setState form). Lint 100% sạch. |
 | 3 | `crm-user-management` | 5175 | **PASS** (Exit 0, 0.90s) | **PASS** (Exit 0, 0 lỗi) | N/A *(Không có script test)* | **PASS** | **BLOCKED** | Quản lý người dùng, phân quyền vai trò. Lint và Build 100% sạch. |
 | 4 | `EP-05-opportunity-filter-frontend` | 5176 | **PASS** (Exit 0, 0.41s) | N/A *(Chưa có script lint)* | **PASS** (Exit 0, 6/6 test) | **PASS** | **BLOCKED** | Tìm kiếm & lọc đa tiêu chí cơ hội. 6/6 test case đạt. |
@@ -95,9 +95,9 @@ Kết quả được ghi nhận từ lần chạy tự động bằng script [ch
 > **TỔNG KẾT KỸ THUẬT:**  
 > - **Build:** **23/23 PASS (100%)** – Không còn bất kỳ phân hệ nào bị lỗi đóng gói.  
 > - **Unit Test:** **8/8 Phân hệ có test PASS (100%, 80/80 test case)** – 0 test fail. 15 phân hệ còn lại là N/A do chưa có mã kiểm thử.  
-> - **Linting:** **5/5 Submodule cấu hình lint PASS (100% sạch lỗi, exit code 0)**. Root App exit code 1 do code monolithic cũ. 17 submodule còn lại N/A.  
+> - **Linting:** **6/6 Phân hệ cấu hình lint PASS (100% sạch lỗi, exit code 0)** gồm Root App, crm-customer-management, crm-user-management, EP-05-Sales-Pipeline-Nam, EP-06-CRM-Activities-Tasks-Nam, sprint4-lead-marketing. 17 submodule còn lại N/A.  
 > - **Giao diện:** **23/23 Render thành công** trên môi trường Chromium.  
-> - **Tích hợp:** **23/23 BLOCKED** – Cần hoàn thiện lớp API client cho các submodule và đồng bộ cổng Backend.
+> - **Tích hợp:** **22/22 Submodule BLOCKED** (chưa nối API thật) & Root App đã khắc phục xong phiên xác thực BUG-07.
 
 ---
 
@@ -118,16 +118,25 @@ Toàn bộ các lỗi được khắc phục đúng nguyên nhân kỹ thuật g
 
 ---
 
-### 🎫 BUG-02: Bổ Sung Cấu Hình ESLint Flat Config cho Thư Mục Gốc
+### 🎫 BUG-02: Bổ Sung Flat Config và Khắc Phục Triệt Để 46 Lỗi Lint Của Root CRM App
 - **Phân hệ:** `Root CRM App` (`qa-crm-frontend`)
-- **Tập tin:** [eslint.config.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/eslint.config.js)
-- **Nguyên nhân gốc:** Thư mục gốc có khai báo `"lint": "eslint ."` trong `package.json` và cài đặt `eslint@^10.10.0`, nhưng hoàn toàn thiếu file cấu hình Flat Config `eslint.config.js`. Do đó lệnh `npm run lint` dừng ngay lập tức với lỗi `Could not find an eslint.config.* file`.
-- **Biện pháp xử lý:** Tạo mới [eslint.config.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/eslint.config.js) tương thích chuẩn ESLint 10, mở rộng các quy tắc `js.configs.recommended`, `reactHooks.configs.flat.recommended`, `reactRefresh.configs.vite`, và ignore các thư mục con độc lập.
+- **Tập tin:** [eslint.config.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/eslint.config.js), [src/Sprint4.jsx](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/src/Sprint4.jsx), [src/App.jsx](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/src/App.jsx)
+- **Nguyên nhân gốc:**
+  1. Ban đầu thiếu file cấu hình Flat Config `eslint.config.js`.
+  2. Khi quét ESLint, phát hiện 46 lỗi và 14 cảnh báo vi phạm chuẩn React Hooks trong `src/Sprint4.jsx` (17 lỗi, 3 warnings) và `src/App.jsx` (29 lỗi, 11 warnings) bao gồm: gọi `setState` đồng bộ trong `useEffect` gây re-render cascading, truy cập ref trong render, render không thuần khiết (`Date.now()`), biến/import chưa định nghĩa hoặc không sử dụng.
+- **Biện pháp xử lý (Tuyệt đối không tắt rule, không dùng eslint-disable):**
+  - **Nhóm 1 (`src/Sprint4.jsx`):** Chuẩn hóa toàn bộ hook; chuyển `setFilters` sang render-time adjustment; di chuyển gán ref vào `useEffect`; dọn sạch các biến và helper dư thừa.
+  - **Nhóm 2 (`src/App.jsx`):** Khởi tạo state gắn với prop quyền hạn; chuyển pagination `setPage(1)` và render reset sang pattern chuẩn React 19; loại bỏ import/component không dùng (`StatCard`, `PieChart`,...); khai báo hằng số danh sách task tĩnh; chuẩn hóa cờ hủy `ignore` cho data fetching.
 - **Kết quả kiểm thử lại:**
-  - Lệnh: `npm run lint`
-  - Exit code: `1` (ESLint đã tìm thấy cấu hình và quét toàn bộ thư mục `src/`).
-  - Ghi nhận QA: Phát hiện 46 lỗi và 14 cảnh báo trong code nguyên bản của `src/App.jsx` và `src/Sprint4.jsx` (chủ yếu là `react-hooks/set-state-in-effect` do React 19 compiler flag và biến thừa).
-  - Tình trạng: **RESOLVED CONFIGURATION (ĐÃ BỔ SUNG CẤU HÌNH HỢP LỆ; GIỮ NGUYÊN BÁO CÁO LỖI LINT CỦA CODE GỐC THEO ĐÚNG NGUYÊN TẮC QA KHÔNG TỰ Ý SỬA CODE KHÔNG THUỘC PHẠM VI)**.
+  - Lệnh: `npm run lint` (`eslint .`)
+  - Exit code: `0`
+  - Kết quả: **0 errors, 0 warnings (100% SẠCH LỖI)**.
+  - Tình trạng: **RESOLVED (ĐÃ KHẮC PHỤC TRIỆT ĐỂ 100%)**.
+  - Commit SHA:
+    - Cấu hình ban đầu: [`191e30a`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) (`feat(qa/BUG-02): bo sung cau hinh ESLint Flat Config cho thu muc goc`).
+    - Sửa Nhóm 1: [`12e93d7`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) (`fix(qa/BUG-02): xu ly 17 loi lint va 3 warning trong src/Sprint4.jsx theo chuan react-hooks`).
+    - Sửa Nhóm 2: [`7d6ef0b`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) (`fix(qa/BUG-02): xu ly 29 loi lint va 11 warning trong src/App.jsx theo chuan react-hooks`).
+  - Trạng thái push: **ĐÃ PUSH** (`origin/qa/frontend-verification`).
 
 ---
 
@@ -202,18 +211,48 @@ Toàn bộ các lỗi được khắc phục đúng nguyên nhân kỹ thuật g
 
 ---
 
-### 🎫 BUG-07: Lệch Cổng API Backend (8000 vs 5000) & Thiếu Proxy Dev
-- **Phân hệ:** `Root CRM App` ([src/api.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/src/api.js), [vite.config.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/vite.config.js))
-- **Nguyên nhân gốc:** Frontend mặc định gọi `http://127.0.0.1:8000`, trong khi Backend Flask đang hoạt động tại cổng `5000`. Khi mở dev server, trình duyệt báo lỗi Connection Refused và sập xác thực phiên.
+### 🎫 BUG-07: Cấu Hình API Backend Thật, Quản Lý Phiên JWT và Proxy Bản Build Preview
+- **Phân hệ:** `Root CRM App` ([src/api.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/src/api.js), [src/App.jsx](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/src/App.jsx), [vite.config.js](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/vite.config.js))
+- **Nguyên nhân gốc:**
+  1. Ban đầu Frontend gọi cứng port 8000 trong khi Backend Flask đang hoạt động tại cổng 5000.
+  2. Backend yêu cầu xác thực JWT qua header `Authorization: Bearer <token>`, nhưng `src/api.js` chỉ gửi `credentials: 'include'` mà không đính kèm Bearer token.
+  3. Lệnh `vite preview` không kế thừa proxy từ `server.proxy` nếu thiếu `preview.proxy`, khiến bản build production chạy ngoài dev server không thể kết nối tới Backend (lỗi CORS hoặc 404).
+  4. Form Login gửi `{ email }` trong khi Backend Flask yêu cầu `{ username }`.
 - **Biện pháp xử lý:**
-  1. Cấu hình proxy `/api` trong `vite.config.js` trỏ về `http://127.0.0.1:5000`.
-  2. Bổ sung cơ chế fallback tự động trong `src/api.js` thử kết nối cổng 5000 nếu cổng 8000 không phản hồi.
-- **Kết quả kiểm thử lại:**
-  - Lệnh: `npm run build`
-  - Exit code: `0`
-  - Thời gian build: `527ms`, bundle tạo thành công.
-  - Tình trạng: **RESOLVED (ĐÃ KHẮC PHỤC TRIỆT ĐỂ)**.
-  - Commit SHA: [`5a3cda3`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) (Đã push lên `origin/qa/frontend-verification`).
+  1. Cấu hình proxy `/api` trỏ về `http://127.0.0.1:5000` cho cả `server` và `preview` trong `vite.config.js`.
+  2. Nâng cấp `src/api.js`: tự động lưu `access_token` vào `sessionStorage`, tự động đính kèm `Authorization: Bearer <token>` vào mọi request, tự động xóa token khi logout hoặc khi nhận sự kiện `crm:session-expired`, và hỗ trợ cơ chế fallback thông minh sang port 5000/8000.
+  3. Chuẩn hóa payload đăng nhập gửi cả `username` và `email`, chuẩn hóa mapping role `admin` $\rightarrow$ `ADMIN`.
+- **Kết quả kiểm thử lại (Retest thực tế trên Browser & Bản build Preview ngoài Dev Server):**
+  - **1. Đăng nhập sai:**
+    - Request URL: `POST http://localhost:3000/api/auth/login` (Body: `{"username":"quantri","password":"wrong_password_999"}`)
+    - Kết quả: `HTTP 401 UNAUTHORIZED`, Response: `{"detail":"Tên đăng nhập hoặc mật khẩu không đúng.","error_code":"UNAUTHORIZED"}`.
+    - UI: Hiển thị banner thông báo lỗi đỏ chính xác.
+  - **2. Đăng nhập đúng:**
+    - Request URL: `POST http://localhost:3000/api/auth/login` (Body: `{"username":"quantri","password":"123456"}`)
+    - Kết quả: `HTTP 200 OK`, Bằng chứng Token đã che: `eyJ1aWQiOj...p18IUM`.
+    - User trả về: `{"id":7,"username":"quantri","full_name":"Quản trị hệ thống","role":"admin"}`.
+    - UI: Chuyển hướng vào màn hình Dashboard với vai trò Quản trị viên.
+  - **3. Tải lại trang (F5):**
+    - Request URL: `GET http://localhost:3000/api/auth/me` (Header: `Authorization: Bearer eyJ1aWQiOj...p18IUM`)
+    - Kết quả: `HTTP 200 OK`, Response: `{"id":7,"username":"quantri","full_name":"Quản trị hệ thống",...}`.
+    - UI: Phiên làm việc được duy trì liên tục từ `sessionStorage`, không bị văng ra trang Login.
+  - **4. Đăng xuất:**
+    - Request URL: `POST http://localhost:3000/api/auth/logout` (Header: Bearer token)
+    - Kết quả: `HTTP 200 OK`, Response: `{"message":"Đăng xuất thành công. Phiên làm việc đã được thu hồi trên máy chủ."}`.
+    - UI: Xóa sạch token, chuyển hướng về trang Login.
+  - **5. Phiên hết hạn / Token không hợp lệ:**
+    - Request URL: `GET http://localhost:3000/api/auth/me` (Header: Token giả mạo/hết hạn)
+    - Kết quả: `HTTP 401 UNAUTHORIZED`, Response: `{"detail":"Token đăng nhập không hợp lệ.","error_code":"UNAUTHORIZED"}`.
+    - UI: Kích hoạt sự kiện `crm:session-expired`, hiển thị banner thông báo *"Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại."*.
+  - **6. Backend mất kết nối:**
+    - Thử nghiệm cổng 8000 offline: Nhận lỗi `ECONNREFUSED` $\rightarrow$ Tự động fallback sang cổng 5000; khi toàn bộ backend offline hiển thị thông báo lỗi kết nối máy chủ rõ ràng.
+  - **7. Kiểm tra bản build qua Preview:**
+    - Đã build `npm run build` (Exit code 0, 509ms) và chạy `vite preview --port 3000`. Cả 6 kịch bản trên đều chạy thành công 100% ngoài dev server.
+- **Tình trạng:** **RESOLVED (ĐÃ KHẮC PHỤC TRIỆT ĐỂ VÀ RETEST TOÀN DIỆN)**.
+- **Commit SHA:**
+  - [`5a3cda3`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) (`feat(qa/BUG-07): bo sung proxy va co che fallback ket noi backend port 5000 khi port 8000 offline`).
+  - [`f22ff82`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) (`fix(qa/BUG-07): bo sung header Authorization, quan ly token session va preview proxy cho ban build`).
+- **Trạng thái push:** **ĐÃ PUSH** (`origin/qa/frontend-verification`).
 
 ---
 
@@ -222,12 +261,12 @@ Toàn bộ các lỗi được khắc phục đúng nguyên nhân kỹ thuật g
 | Mã lỗi | Phân hệ & Nội dung sửa | Lệnh kiểm tra | Kết quả Retest | Commit SHA | Trạng thái Push |
 |:---|:---|:---|:---:|:---:|:---:|
 | **BUG-01** | `Root CRM App`: Sửa import `./index.css` $\rightarrow$ `./styles.css` trong `src/main.jsx` | `npm run build` | **PASS** (Exit 0, 513ms) | [`0de9b45`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
-| **BUG-02** | `Root CRM App`: Bổ sung Flat Config `eslint.config.js` chuẩn Vite React | `npm run lint` | **CONFIG PASS** (Exit 1: 46 errs code gốc) | [`191e30a`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
+| **BUG-02** | `Root CRM App`: Flat Config & sửa 46 lỗi lint (`src/Sprint4.jsx`, `src/App.jsx`) | `npm run lint` | **PASS** (0 errors, 0 warnings, Exit 0) | [`191e30a`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main)<br>[`12e93d7`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main)<br>[`7d6ef0b`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
 | **BUG-03** | `EP-06-CSR103`: Bổ sung entrypoint `src/main.jsx` mount component `App` | `npm run build` | **PASS** (Exit 0, 1.92s) | [`0b7af26`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
 | **BUG-04** | `EP-05-opportunity-sharing`: Cố định fixture thời gian tĩnh trong `shareLogic.test.js` | `npm test` | **PASS** (10/10 test case, Exit 0) | [`f23e6e6`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
 | **BUG-05** | `EP-05-opportunity-history`: Chuẩn hóa Unicode `\u00A0`, Web Storage mock, scope modal query | `npm test` | **PASS** (8/8 test case, Exit 0) | [`e046f19`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
 | **BUG-06** | `crm-customer-management` & `Sales-Pipeline`: Xử lý setState trong render, bỏ useEffect | `npm run lint` | **PASS** (0 errors, 0 warnings, Exit 0) | [`2b3c0d6`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
-| **BUG-07** | `Root CRM App`: Proxy `/api` và fallback port 5000 khi port 8000 offline | `npm run build` | **PASS** (Exit 0, 527ms) | [`5a3cda3`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
+| **BUG-07** | `Root CRM App`: Proxy dev & preview, JWT Authorization header, session persistence | `vite preview` + API probe | **PASS** (6/6 kịch bản auth & session) | [`5a3cda3`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main)<br>[`f22ff82`](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main) | **ĐÃ PUSH** (`origin/qa/frontend-verification`) |
 
 ---
 
@@ -289,36 +328,68 @@ Nhằm giải đáp thỏa đáng yêu cầu kiểm thử tích hợp của Trư
     - Token: `eyJ1aWQiOjd9.at8AVA.ypk6O1T9s2HnCb2aTUwL15TdsJw` (Bearer token, hợp lệ 8 giờ).
     - Thông tin người dùng: `id: 7, username: quantri, role: admin, full_name: Quản trị hệ thống`.
 
-### 7.2. Vì sao Vẫn Đánh giá Tích hợp là BLOCKED (Không Thể Tự Ý PASS)?
-1. **Lệch cổng cấu hình:** File [src/api.js:L1](file:///c:/Users/Dell%20Precision%205550/Music/he-thong-quan-ly-khach-hang-frontend-main%20%281%29/he-thong-quan-ly-khach-hang-frontend-main/src/api.js#L1) của Frontend mặc định gọi tới `http://127.0.0.1:8000`. Khi mở ứng dụng trên trình duyệt, trình duyệt không tìm thấy server tại cổng 8000.
-2. **Kiến trúc tách rời của 22 Submodule:** 22 thư mục con (`EP-05-*`, `EP-06-*`, `S04-*`) được phát triển dưới dạng các nguyên mẫu UI độc lập (standalone UI widgets). Dữ liệu hoàn toàn được nạp từ các file mock cố định:
-   - `mockOpportunities.js`
-   - `mockUsers.js`
-   - `mockTimelineEvents.js`
-   - `seed.js`
-   Không có module con nào chứa mã nguồn thực hiện gọi `fetch()` hay `axios()` tới các endpoint API của Backend.
-3. **Kết luận nguyên tắc:** Mặc dù Backend Flask đã hoạt động trên máy, việc Frontend và các module con chưa được nối dây (wire-up) API thực tế đồng nghĩa với việc **chưa có luồng tích hợp thật nào diễn ra**. Do đó, trạng thái kỹ thuật chính xác bắt buộc phải duy trì là **BLOCKED**, tuyệt đối không giả mạo kết quả PASS bằng mock data.
+### 7.2. Danh Sách 22 Module Chưa Nối API & Đối Chiếu Endpoint Backend (Đã Có vs Còn Thiếu)
+
+Nhằm làm rõ hiện trạng tích hợp theo đúng yêu cầu kiểm định, QA đã thực hiện rà soát toàn bộ 22 module giao diện con, probe thực tế trên tiến trình Backend đang chạy tại cổng `5000`, đồng thời đối chiếu với các thư mục mã nguồn Backend (`sprint1/backend/app/`, `SCRUM-*`, `scrum_*`).
+
+Kết quả phân loại chi tiết:
+
+| STT | Phân hệ Frontend (Submodule) | Endpoint Backend Mục Tiêu | Trạng Thái Endpoint Trên Backend (Port 5000) | Hiện Trạng Phía Frontend | Đánh Giá Tích Hợp QA |
+|:---:|:---|:---|:---:|:---:|:---:|
+| 1 | `crm-customer-management` | `GET/POST /api/customers` | ❌ **MISSING TRÊN 5000** *(Có file trong `sprint1/backend/app/customers.py` nhưng chưa mount)* | Dùng mock state trong RAM | ⛔ **BLOCKED** |
+| 2 | `crm-user-management` | `GET/POST /api/users`, `/api/roles` | ❌ **MISSING TRÊN 5000** *(Có trong `sprint1/backend/app/users.py`, `roles.py`)* | Dùng mock state trong RAM | ⛔ **BLOCKED** |
+| 3 | `EP-05-opportunity-filter-frontend` | `GET /api/opportunity-filters` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-96-opportunity-search-filter-backend`)* | Dùng filter mảng tĩnh `mockOpportunities.js` | ⛔ **BLOCKED** |
+| 4 | `EP-05-opportunity-history-frontend` | `GET /api/opportunity-history` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-95-opportunity-change-history-backend`)* | Lưu lịch sử vào Web Storage cục bộ | ⛔ **BLOCKED** |
+| 5 | `EP-05-opportunity-sharing-frontend` | `GET/POST /api/opportunity-shares` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-97-opportunity-sharing-ownership-backend`)* | Thao tác trên mảng object `mockUsers.js` | ⛔ **BLOCKED** |
+| 6 | `EP-05-Sales-Pipeline-Nam` | `GET/PUT /api/pipeline-stages` | ❌ **MISSING TRÊN 5000** *(Có trong `sprint1/backend/app/pipeline_stages.py`)* | Dùng mock stage trong component state | ⛔ **BLOCKED** |
+| 7 | `EP-05-SCR98-opportunity-documents-frontend` | `GET/POST /api/opportunity-documents` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-98-opportunity-attachments-backend`)* | Lưu danh sách tài liệu đính kèm vào state | ⛔ **BLOCKED** |
+| 8 | `EP-06-CRM-Activities-Tasks-Nam` | `GET/POST /api/tasks`, `/api/activities/quick` | ✅ **ĐÃ CÓ TRÊN 5000** *(HTTP 200 OK)* | Chưa nối client API, vẫn dùng state local | ⛔ **BLOCKED** |
+| 9 | `EP-06-CSR103-reminders-frontend` | `GET/POST /api/tasks/reminders` | ✅ **ĐÃ CÓ TRÊN 5000** *(HTTP 200 OK)* | Lưu cấu hình nhắc việc vào `localStorage` | ⛔ **BLOCKED** |
+| 10 | `EP-06-CSR104-call-logging-frontend` | `GET/POST /api/call-logs` | ❌ **MISSING TRÊN 5000** *(Có trong `sprint1/backend/app/call_logs.py`)* | Lưu log cuộc gọi trong RAM | ⛔ **BLOCKED** |
+| 11 | `lead-assignment-sla-Scr85-04` | `GET/POST /api/leads/sla` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-84-lead-accept-reject-sla-backend`)* | Đếm ngược SLA bằng `setInterval` local | ⛔ **BLOCKED** |
+| 12 | `lead-list-filters-Scr86-04` | `GET /api/leads/filters` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-86-lead-filter-saved-backend`)* | Lọc danh sách lead tĩnh | ⛔ **BLOCKED** |
+| 13 | `S04-04-Scrum81-lead-deduplication` | `GET/POST /api/lead-dedup` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_81_lead_dedup`)* | Dùng thuật toán so khớp local trên mock lead | ⛔ **BLOCKED** |
+| 14 | `S04-04-Scrum82-lead-scoring` | `GET/POST /api/lead-scoring` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_82_lead_scoring`)* | Chấm điểm lead bằng rule nội bộ React | ⛔ **BLOCKED** |
+| 15 | `S04-04-Scrum83-lead-routing` | `GET/POST /api/lead-assignment` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_83_lead_assignment`)* | Phân bổ lead mẫu vào state | ⛔ **BLOCKED** |
+| 16 | `S04-05-Scrum91-opportunity-close` | `POST /api/opportunity-close` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_91_close_opportunity`)* | Chuyển trạng thái Thắng/Thua trong state | ⛔ **BLOCKED** |
+| 17 | `S04-05-Scrum92-revenue-forecast` | `GET /api/revenue-forecast` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_92_sales_forecast`)* | Tính toán doanh thu dự báo bằng mảng cố định | ⛔ **BLOCKED** |
+| 18 | `S04-05-Scrum93-stagnant-opportunity-alert` | `GET /api/stagnant-opportunities` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_93_stagnant_opportunity`)* | Kiểm tra mốc ngày so với `Date.now()` trong RAM | ⛔ **BLOCKED** |
+| 19 | `S04-05-Scrum94-reassign-opportunity` | `POST /api/opportunity-transfer` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_94_opportunity_transfer`)* | Đổi owner cơ hội trên mock data | ⛔ **BLOCKED** |
+| 20 | `S04-06-Scrum101-sales-calendar` | `GET/POST /api/sales-calendar` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_101_team_calendar`)* | Vẽ lịch công tác từ dữ liệu mẫu | ⛔ **BLOCKED** |
+| 21 | `S04-06-Scrum102-customer-timeline` | `GET /api/customer-timeline` | ❌ **MISSING TRÊN 5000** *(Có service riêng `scrum_102_customer_timeline`)* | Render timeline 360 độ từ `mockTimelineEvents.js` | ⛔ **BLOCKED** |
+| 22 | `sprint4-lead-marketing` | `GET/POST /api/campaigns`, `/api/leads` | ❌ **MISSING TRÊN 5000** *(Frontend submodule độc lập)* | Dùng mảng lead và form campaign tĩnh | ⛔ **BLOCKED** |
+
+### 7.3. Kết Luận Nguyên Tắc Về Tích Hợp Hệ Thống
+1. **Root CRM App:** Đã giải quyết triệt để phiên đăng nhập thật với Backend port 5000 (xác thực token Bearer, reload session, logout, session expired). Các API `auth/me`, `dashboard/stats` có cơ chế fallback hoạt động ổn định.
+2. **22 Submodule độc lập:** Vẫn đang vận hành hoàn toàn độc lập dưới dạng nguyên mẫu (mock prototype), chưa nối dây API hoặc endpoint phía backend chưa được hợp nhất vào cổng chung 5000.
+3. **Quan điểm QA:** **BẢO LƯU ĐÁNH GIÁ BLOCKED CHO TẤT CẢ 22 SUBMODULE**. Tuyệt đối không kết luận toàn hệ thống PASS khi dữ liệu chưa thực sự lưu vào CSDL Backend.
 
 ---
 
-## 8. ĐÁNH GIÁ NGHIỆM THU & ĐIỀU KIỆN MỞ PR VÀO MAIN
+## 8. ĐÁNH GIÁ NGHIỆM THU & QUY TRÌNH REVIEW QUA DRAFT PULL REQUEST
 
 ### 8.1. Đánh giá Mức độ Đạt Yêu Cầu
-- [x] **Trạng thái Git:** Giữ nguyên các commit của thành viên, kiểm thử độc lập trên `qa/frontend-verification`.
-- [x] **Khắc phục Bug:** BUG-01 đến BUG-06 đã được xác minh nguyên nhân gốc và sửa dứt điểm.
-- [x] **Quy chuẩn Lint & Test:** Không tắt bất kỳ quy tắc lint nào; không giảm assertion; dùng mốc thời gian cố định và mock storage độc lập.
-- [x] **Ma trận 23 phân hệ:** Đầy đủ thông tin lệnh chạy, mã thoát exit code, kết quả từng phần và lý do cụ thể cho các mục N/A.
-- [x] **Minh chứng UI:** 23/23 phân hệ đã hiển thị được; làm rõ ranh giới giữa giao diện hiển thị và nghiệp vụ tích hợp.
-- [x] **Hiện trạng Backend:** Ghi nhận chính xác tình trạng Backend port 5000 và lý do kỹ thuật khiến tích hợp bị BLOCKED.
+- [x] **Trạng thái Git:** Giữ nguyên vẹn lịch sử commit của remote, không rewrite/force push, mọi commit mới là forward linear commits trên `qa/frontend-verification`.
+- [x] **Khắc phục Bug:** BUG-01 đến BUG-07 đã được sửa dứt điểm, kiểm tra thực tế và đẩy đủ commit lên remote.
+- [x] **Quy chuẩn Lint & Test:**
+  - 100% 46 lỗi và 14 cảnh báo của Root App được giải quyết theo chuẩn React Hooks hiện đại mà **không tắt bất kỳ quy tắc nào**.
+  - Toàn bộ 80/80 test case unit test PASS 100%.
+  - Toàn bộ 23/23 phân hệ build PASS 100%.
+- [x] **Bản Build Preview:** Đã cấu hình `preview.proxy` trong `vite.config.js` và chứng minh API hoạt động ngoài dev server.
+- [x] **Ma trận 23 phân hệ:** Đầy đủ thông tin lệnh chạy, exit code, kết quả từng phần và lý do cụ thể cho các mục N/A.
+- [x] **Minh chứng UI & API:** Ghi nhận request URL, mã HTTP, bằng chứng token đã che (`eyJ...***`).
+- [x] **Minh bạch tích hợp:** Lập danh sách 22 submodule chưa nối API và phân định rõ ràng các endpoint có/thiếu.
 
-### 8.2. Kế hoạch Hành Động Kế Tiếp (Next Steps)
-1. **Tạo Commit QA:** Đóng gói toàn bộ các bản sửa lỗi sạch trên nhánh `qa/frontend-verification`:
-   ```bash
-   git add -A
-   git commit -m "fix(qa): resolve BUG-01 to BUG-06 cleanly and update comprehensive verification matrix"
-   git push origin qa/frontend-verification
-   ```
-2. **Mở Pull Request vào `main` để Review:**
-   - Tạo PR từ `qa/frontend-verification` vào `main`.
-   - Tiêu đề: `fix(qa): khắc phục hoàn toàn BUG-01 đến BUG-06 và hoàn thiện báo cáo kiểm định 23 phân hệ`
-   - Nội dung PR: Đính kèm tóm tắt ma trận 23 phân hệ (Build 23/23 PASS, Unit Test 80/80 PASS), chỉ rõ các lỗi đã sửa và **cảnh báo rõ ràng điều kiện BLOCKED về tích hợp Backend để các lập trình viên Backend tiếp tục phối hợp trước khi bấm Merge**.
+### 8.2. Quy Trình Đưa Lên Main (Draft Pull Request Review)
+> ⚠️ **KHUYẾN NGHỊ QA QUAN TRỌNG:**  
+> **CHƯA ĐỦ ĐIỀU KIỆN ĐỂ KẾT LUẬN TOÀN HỆ THỐNG PASS VÀ CHƯA ĐƯỢC MERGE TRỰC TIẾP VÀO `main`!**  
+> Vì 22/23 phân hệ tích hợp vẫn đang ở trạng thái **BLOCKED**, nhánh `qa/frontend-verification` chỉ nên được mở dưới dạng **Draft Pull Request** để nhóm phát triển Backend và Hội đồng đánh giá thực hiện review mã nguồn:
+> 
+> 1. **Mở Draft Pull Request:**
+>    - Nhánh nguồn: `qa/frontend-verification`
+>    - Nhánh đích: `main`
+>    - Trạng thái: **Draft PR**
+>    - Tiêu đề: `[DRAFT] QA: Khắc phục BUG-01 đến BUG-07, chuẩn hóa linting và hoàn thiện báo cáo tích hợp 23 phân hệ`
+> 2. **Phạm vi Review:**
+>    - Đánh giá các thay đổi sửa lỗi build, CSS, entrypoint, unit test fixture, Flat Config ESLint, token JWT và preview proxy.
+>    - Phối hợp với đội Backend để hợp nhất các endpoint còn thiếu của 22 submodule trước khi hoàn tất kiểm thử tích hợp (End-to-End) và nghiệm thu chính thức.
