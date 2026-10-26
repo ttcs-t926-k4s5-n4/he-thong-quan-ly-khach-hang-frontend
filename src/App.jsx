@@ -5,8 +5,8 @@ import {
   LayoutDashboard, Users, LogOut, KeyRound, BriefcaseBusiness, Menu, X, Upload, BookOpen, Search,
   ShieldCheck, Package, GitBranch, ListTree, FileClock, UserCircle, HeartHandshake, Merge, Building2,
   Tags, Settings2, ContactRound, AlertCircle, CheckCircle2, FileSpreadsheet, Filter, Plus, Edit,
-  Lock, Unlock, Download, RefreshCw, ChevronDown, ChevronRight, ChevronUp, TrendingUp, DollarSign,
-  Award, Clock, CheckSquare, Calendar, PieChart, BarChart3, ArrowUpRight, ArrowDownRight, Activity, Target,
+  Lock, Unlock, Download, RefreshCw, ChevronRight, ChevronUp, TrendingUp, DollarSign,
+  Award, CheckSquare, Calendar, BarChart3, ArrowUpRight, Activity, Target,
   ArrowLeft, Eye, Zap
 } from 'lucide-react'
 
@@ -137,7 +137,7 @@ function formatDateVi(val) {
       if (!isNaN(d.getTime())) {
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       }
-    } catch (e) {}
+    } catch (e) { void e }
   }
   return val
 }
@@ -278,9 +278,13 @@ function Table({
   const [pageSize, setPageSize] = useState(defaultPageSize)
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
+  const [prevRowsLength, setPrevRowsLength] = useState(rows.length)
+  const [prevSearchTerm, setPrevSearchTerm] = useState(searchTerm)
+  if (rows.length !== prevRowsLength || searchTerm !== prevSearchTerm) {
+    setPrevRowsLength(rows.length)
+    setPrevSearchTerm(searchTerm)
     setPage(1)
-  }, [rows.length, searchTerm])
+  }
 
   const filteredRows = React.useMemo(() => {
     if (!searchTerm.trim()) return rows
@@ -368,22 +372,6 @@ function Table({
   )
 }
 
-function StatCard({ title, value, subtext, icon: Icon, color = '#4f46e5', bgLight = '#eef2ff' }) {
-  return (
-    <div className="stat-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-        <div className="stat-card-title">{title}</div>
-        {Icon && (
-          <div style={{ background: bgLight, color: color, padding: '6px', borderRadius: '8px', display: 'flex' }}>
-            <Icon size={18} />
-          </div>
-        )}
-      </div>
-      <div className="stat-card-val" style={{ color }}>{value}</div>
-      {subtext && <div style={{ fontSize: '12.5px', color, fontWeight: 600 }}>{subtext}</div>}
-    </div>
-  )
-}
 
 function Modal({ isOpen, onClose, title, icon: Icon, children, maxWidth = '650px' }) {
   if (!isOpen) return null
@@ -538,10 +526,12 @@ function Activate() {
   const [m, setM] = useState('Đang kích hoạt tài khoản...')
 
   useEffect(() => {
+    let ignore = false
     api('/api/auth/activate/' + t, { method: 'POST' })
-      .then(d => setM(d.message))
-      .catch(e => setM(errText(e)))
-  }, [])
+      .then(d => { if (!ignore) setM(d.message) })
+      .catch(e => { if (!ignore) setM(errText(e)) })
+    return () => { ignore = true }
+  }, [t])
 
   return (
     <div className="auth-shell">
@@ -997,6 +987,13 @@ function Shell({ user, menu, onLogout, children }) {
   )
 }
 
+const DEFAULT_TASKS = [
+  { id: 1, title: 'Gửi báo giá dự án ERP cho Tập đoàn Alpha', tag: 'Ưu tiên cao', due: 'Hôm nay' },
+  { id: 2, title: 'Gọi điện chăm sóc 5 khách hàng quá hạn 30 ngày', tag: 'Chăm sóc', due: 'Hôm nay' },
+  { id: 3, title: 'Phê duyệt hợp đồng cung cấp phần mềm CRM', tag: 'Hợp đồng', due: 'Ngày mai' },
+  { id: 4, title: 'Đánh giá KPI tuần đội ngũ Telesale & Marketing', tag: 'Quản lý', due: 'Thứ 6' }
+]
+
 function Home({ user, menu }) {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -1004,7 +1001,6 @@ function Home({ user, menu }) {
   const [err, setErr] = useState('')
   const [timeRange, setTimeRange] = useState('month')
   const [activeTab, setActiveTab] = useState('revenue')
-  const [checkedTasks, setCheckedTasks] = useState({})
 
   const allowedPaths = React.useMemo(() => new Set((menu || []).map(x => x.path)), [menu])
   const can = path => allowedPaths.has(path)
@@ -1013,88 +1009,92 @@ function Home({ user, menu }) {
   const hasBusinessDashboard = can('/crm-customers') || can('/customers') || can('/care') || can('/support') || can('/pipeline')
   const marketingOnly = roles.has('MARKETING') && !hasBusinessDashboard
 
-  const fetchStats = (isSilent = false) => {
-    if (!hasBusinessDashboard) {
-      setStats({})
-      setErr('')
-      setLoading(false)
-      setRefreshing(false)
-      return
-    }
-    if (!isSilent) setLoading(true)
-    else setRefreshing(true)
-    setErr('')
-
+  const fetchStats = () => {
+    if (!hasBusinessDashboard) return
+    setRefreshing(true)
     api('/api/dashboard/stats')
-      .then(d => setStats(d))
-      .catch(e => {
-        setErr(errText(e))
-        // Fallback gracefully to demo state if API fails
-        setStats({
-          total_customers: 128,
-          total_opportunities: 42,
-          pipeline_value: 3850000000,
-          won_value: 1420000000,
-          won_count: 14,
-          open_tickets: 2,
-          care_due_count: 5,
-          conversion_rate: 33.3,
-          stages: [
-            { stage: 'Mới tạo', count: 12, value: 950000000 },
-            { stage: 'Tiếp cận', count: 10, value: 820000000 },
-            { stage: 'Báo giá', count: 8, value: 740000000 },
-            { stage: 'Thương lượng', count: 6, value: 680000000 },
-            { stage: 'Chốt hợp đồng', count: 6, value: 660000000 }
-          ],
-          top_opportunities: [
-            { id: 1, title: 'Hợp đồng ERP Tập đoàn Alpha', customer_name: 'Tập đoàn Alpha', value: 850000000, stage: 'Thương lượng', win_probability: 80, owner_name: user.full_name },
-            { id: 2, title: 'Triển khai CRM cho Beta Corp', customer_name: 'Công ty Beta', value: 620000000, stage: 'Báo giá', win_probability: 65, owner_name: 'Nguyễn Văn A' },
-            { id: 3, title: 'Gói bảo trì hệ thống Gamma', customer_name: 'Tập đoàn Gamma', value: 450000000, stage: 'Chốt', win_probability: 95, owner_name: 'Trần Thị B' },
-            { id: 4, title: 'Nâng cấp Hạ tầng Cloud Delta', customer_name: 'Delta Tech', value: 380000000, stage: 'Tiếp cận', win_probability: 40, owner_name: user.full_name },
-            { id: 5, title: 'Tư vấn Chuyển đổi số Epsilon', customer_name: 'Epsilon Group', value: 290000000, stage: 'Mới tạo', win_probability: 30, owner_name: 'Lê Văn C' }
-          ],
-          recent_activities: [
-            { id: 101, subject: 'Họp chốt hợp đồng dự án ERP', activity_type: 'Cuộc họp', customer_name: 'Tập đoàn Alpha', owner_name: user.full_name, created_at: new Date().toISOString() },
-            { id: 102, subject: 'Gửi báo giá dịch vụ CRM 2026', activity_type: 'Email', customer_name: 'Công ty Beta', owner_name: 'Nguyễn Văn A', created_at: new Date(Date.now() - 3600000 * 2).toISOString() },
-            { id: 103, subject: 'Gọi điện xác nhận lịch hẹn demo', activity_type: 'Cuộc gọi', customer_name: 'Delta Tech', owner_name: user.full_name, created_at: new Date(Date.now() - 3600000 * 5).toISOString() },
-            { id: 104, subject: 'Tải tài liệu giới thiệu giải pháp', activity_type: 'Ghi chú', customer_name: 'Tập đoàn Gamma', owner_name: 'Trần Thị B', created_at: new Date(Date.now() - 3600000 * 24).toISOString() }
-          ],
-          recent_customers: [
-            { id: 201, name: 'Công ty Cổ phần Công nghệ Alpha', email: 'contact@alpha.vn', phone: '0901234567', owner_name: user.full_name, created_at: new Date().toISOString() },
-            { id: 202, name: 'Tập đoàn Bất động sản Horizon', email: 'info@horizon.com', phone: '0988776655', owner_name: 'Nguyễn Văn A', created_at: new Date(Date.now() - 86400000).toISOString() },
-            { id: 203, name: 'Công ty TNHH Giải pháp Phần mềm Việt', email: 'sales@vsoft.vn', phone: '0912348899', owner_name: 'Trần Thị B', created_at: new Date(Date.now() - 86400000 * 2).toISOString() }
-          ],
-          team_performance: [
-            { full_name: user.full_name, total_deals: 18, won_val: 850000000, pipe_val: 1650000000 },
-            { full_name: 'Nguyễn Văn A', total_deals: 14, won_val: 620000000, pipe_val: 1200000000 },
-            { full_name: 'Trần Thị B', total_deals: 10, won_val: 450000000, pipe_val: 900000000 }
-          ]
-        })
-      })
-      .finally(() => {
-        setLoading(false)
-        setRefreshing(false)
-      })
+      .then(d => { setStats(d); setErr('') })
+      .catch(e => setErr(errText(e)))
+      .finally(() => setRefreshing(false))
   }
 
   useEffect(() => {
-    fetchStats()
-  }, [])
+    if (!hasBusinessDashboard) return
+    let ignore = false
+    api('/api/dashboard/stats')
+      .then(d => {
+        if (!ignore) {
+          setStats(d)
+          setErr('')
+          setLoading(false)
+        }
+      })
+      .catch(e => {
+        if (!ignore) {
+          setErr(errText(e))
+          setStats({
+            total_customers: 128,
+            total_opportunities: 42,
+            pipeline_value: 3850000000,
+            won_value: 1420000000,
+            won_count: 14,
+            open_tickets: 2,
+            care_due_count: 5,
+            conversion_rate: 33.3,
+            stages: [
+              { stage: 'Mới tạo', count: 12, value: 950000000 },
+              { stage: 'Tiếp cận', count: 10, value: 820000000 },
+              { stage: 'Báo giá', count: 8, value: 740000000 },
+              { stage: 'Thương lượng', count: 6, value: 680000000 },
+              { stage: 'Chốt hợp đồng', count: 6, value: 660000000 }
+            ],
+            top_opportunities: [
+              { id: 1, title: 'Hợp đồng ERP Tập đoàn Alpha', customer_name: 'Tập đoàn Alpha', value: 850000000, stage: 'Thương lượng', win_probability: 80, owner_name: user?.full_name || 'Quản trị viên' },
+              { id: 2, title: 'Triển khai CRM cho Beta Corp', customer_name: 'Công ty Beta', value: 620000000, stage: 'Báo giá', win_probability: 65, owner_name: 'Nguyễn Văn A' },
+              { id: 3, title: 'Gói bảo trì hệ thống Gamma', customer_name: 'Tập đoàn Gamma', value: 450000000, stage: 'Chốt', win_probability: 95, owner_name: 'Trần Thị B' },
+              { id: 4, title: 'Nâng cấp Hạ tầng Cloud Delta', customer_name: 'Delta Tech', value: 380000000, stage: 'Tiếp cận', win_probability: 40, owner_name: user?.full_name || 'Quản trị viên' },
+              { id: 5, title: 'Tư vấn Chuyển đổi số Epsilon', customer_name: 'Epsilon Group', value: 290000000, stage: 'Mới tạo', win_probability: 30, owner_name: 'Lê Văn C' }
+            ],
+            recent_activities: [
+              { id: 101, subject: 'Họp chốt hợp đồng dự án ERP', activity_type: 'Cuộc họp', customer_name: 'Tập đoàn Alpha', owner_name: user?.full_name || 'Quản trị viên', created_at: new Date().toISOString() },
+              { id: 102, subject: 'Gửi báo giá dịch vụ CRM 2026', activity_type: 'Email', customer_name: 'Công ty Beta', owner_name: 'Nguyễn Văn A', created_at: new Date(Date.now() - 3600000 * 2).toISOString() },
+              { id: 103, subject: 'Gọi điện xác nhận lịch hẹn demo', activity_type: 'Cuộc gọi', customer_name: 'Delta Tech', owner_name: user?.full_name || 'Quản trị viên', created_at: new Date(Date.now() - 3600000 * 5).toISOString() },
+              { id: 104, subject: 'Tải tài liệu giới thiệu giải pháp', activity_type: 'Ghi chú', customer_name: 'Tập đoàn Gamma', owner_name: 'Trần Thị B', created_at: new Date(Date.now() - 3600000 * 24).toISOString() }
+            ],
+            recent_customers: [
+              { id: 201, name: 'Công ty Cổ phần Công nghệ Alpha', email: 'contact@alpha.vn', phone: '0901234567', owner_name: user?.full_name || 'Quản trị viên', created_at: new Date().toISOString() },
+              { id: 202, name: 'Tập đoàn Bất động sản Horizon', email: 'info@horizon.com', phone: '0988776655', owner_name: 'Nguyễn Văn A', created_at: new Date(Date.now() - 86400000).toISOString() },
+              { id: 203, name: 'Công ty TNHH Giải pháp Phần mềm Việt', email: 'sales@vsoft.vn', phone: '0912348899', owner_name: 'Trần Thị B', created_at: new Date(Date.now() - 86400000 * 2).toISOString() }
+            ],
+            team_performance: [
+              { full_name: user?.full_name || 'Quản trị viên', total_deals: 18, won_val: 850000000, pipe_val: 1650000000 },
+              { full_name: 'Nguyễn Văn A', total_deals: 14, won_val: 620000000, pipe_val: 1200000000 },
+              { full_name: 'Trần Thị B', total_deals: 10, won_val: 450000000, pipe_val: 900000000 }
+            ]
+          })
+          setLoading(false)
+        }
+      })
+    return () => { ignore = true }
+  }, [hasBusinessDashboard, user?.full_name])
 
-  if (loading) return <div className="loading">Đang tải bảng tổng quan kinh doanh...</div>
+  const displayLoading = hasBusinessDashboard ? loading : false
+  const displayStats = hasBusinessDashboard ? (stats || {}) : {}
 
-  const totalCust = stats?.total_customers || 0
-  const totalOppVal = stats?.pipeline_value || 0
-  const wonVal = stats?.won_value || 0
-  const wonCount = stats?.won_count || 0
-  const openTickets = stats?.open_tickets || 0
-  const careDue = stats?.care_due_count || 0
-  const convRate = stats?.conversion_rate || 0
-  const stages = stats?.stages || []
-  const topOpps = stats?.top_opportunities || []
-  const recentActivities = stats?.recent_activities || []
-  const recentCust = stats?.recent_customers || []
-  const teamPerf = stats?.team_performance || []
+  if (displayLoading) return <div className="loading">Đang tải bảng tổng quan kinh doanh...</div>
+
+  const totalCust = displayStats?.total_customers || 0
+  const totalOppVal = displayStats?.pipeline_value || 0
+  const wonVal = displayStats?.won_value || 0
+  const wonCount = displayStats?.won_count || 0
+  const openTickets = displayStats?.open_tickets || 0
+  const careDue = displayStats?.care_due_count || 0
+  const convRate = displayStats?.conversion_rate || 0
+  const stages = displayStats?.stages || []
+  const topOpps = displayStats?.top_opportunities || []
+  const recentActivities = displayStats?.recent_activities || []
+  const recentCust = displayStats?.recent_customers || []
+  const teamPerf = displayStats?.team_performance || []
 
   // Monthly Revenue Chart Data
   const monthlyData = [
@@ -1106,17 +1106,6 @@ function Home({ user, menu }) {
     { month: 'Thg 10', target: 1400, actual: Math.round(wonVal / 1000000) || 1420 }
   ]
   const maxMonthly = Math.max(...monthlyData.map(x => Math.max(x.target, x.actual)), 1)
-
-  const defaultTasks = [
-    { id: 1, title: 'Gửi báo giá dự án ERP cho Tập đoàn Alpha', tag: 'Ưu tiên cao', due: 'Hôm nay' },
-    { id: 2, title: 'Gọi điện chăm sóc 5 khách hàng quá hạn 30 ngày', tag: 'Chăm sóc', due: 'Hôm nay' },
-    { id: 3, title: 'Phê duyệt hợp đồng cung cấp phần mềm CRM', tag: 'Hợp đồng', due: 'Ngày mai' },
-    { id: 4, title: 'Rà soát và gộp trùng 2 hồ sơ khách hàng doanh nghiệp', tag: 'Hệ thống', due: 'Tuần này' }
-  ]
-
-  const toggleTask = id => {
-    setCheckedTasks(prev => ({ ...prev, [id]: !prev[id] }))
-  }
 
   const toggleTab = tabKey => {
     setActiveTab(prev => (prev === tabKey ? 'none' : tabKey))
@@ -1570,7 +1559,7 @@ function Home({ user, menu }) {
             <div>
               <h4>Danh sách Việc cần Chăm sóc Hôm nay</h4>
               <div className="task-checklist" style={{ marginTop: '12px' }}>
-                {defaultTasks.map(t => (
+                {DEFAULT_TASKS.map(t => (
                   <div key={t.id} className="task-check-item">
                     <div className="custom-checkbox"><CheckCircle2 size={14} /></div>
                     <span className="task-title">{t.title}</span>
@@ -1685,7 +1674,20 @@ function LegacyCustomers() {
       setM(errText(e))
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let ignore = false
+    api('/api/customers?q=')
+      .then(d => {
+        if (!ignore) {
+          setItems(d.items || [])
+          setScope(d.scope || '')
+        }
+      })
+      .catch(e => {
+        if (!ignore) setM(errText(e))
+      })
+    return () => { ignore = true }
+  }, [])
 
   return (
     <>
@@ -1741,11 +1743,18 @@ function ProfilePage() {
   const [f, setF] = useState(null)
   const [m, setM] = useState('')
   const [file, setFile] = useState(null)
+  const [avatarTimestamp, setAvatarTimestamp] = useState(() => Date.now())
 
   async function load() {
     try { setF(await api('/api/s2/profile')) } catch (e) { setM(errText(e)) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let ignore = false
+    api('/api/s2/profile')
+      .then(d => { if (!ignore) setF(d) })
+      .catch(e => { if (!ignore) setM(errText(e)) })
+    return () => { ignore = true }
+  }, [])
 
   if (!f) return <Notice text={m || 'Đang tải hồ sơ...'} />
 
@@ -1767,6 +1776,7 @@ function ProfilePage() {
       if (!r.ok) throw new Error(d.detail)
       setM(d.message)
       setFile(null)
+      setAvatarTimestamp(Date.now())
       load()
       window.dispatchEvent(new CustomEvent('crm:user-updated'))
     } catch (e) { setM(errText(e)) }
@@ -1784,7 +1794,7 @@ function ProfilePage() {
         </div>
         <div className="profile-avatar-wrap">
           {f.avatar_thumb_path ? (
-            <img className="profile-avatar-large" src={API_BASE + '/api/s2/profile/avatar/thumb?x=' + Date.now()} alt="Ảnh đại diện" />
+            <img className="profile-avatar-large" src={API_BASE + '/api/s2/profile/avatar/thumb?x=' + avatarTimestamp} alt="Ảnh đại diện" />
           ) : (
             <div className="profile-avatar-empty"><UserCircle size={80} /></div>
           )}
@@ -1942,9 +1952,17 @@ function ExcelImport({ kind }) {
   const totalPages = Math.ceil(filteredRows.length / pageSize) || 1
   const displayedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
 
-  useEffect(() => {
+  const [prevFilterTab, setPrevFilterTab] = useState(filterTab)
+  const [prevPreviewSearch, setPrevPreviewSearch] = useState(previewSearch)
+  const [prevPageSize, setPrevPageSize] = useState(pageSize)
+  const [prevPreview, setPrevPreview] = useState(preview)
+  if (filterTab !== prevFilterTab || previewSearch !== prevPreviewSearch || pageSize !== prevPageSize || preview !== prevPreview) {
+    setPrevFilterTab(filterTab)
+    setPrevPreviewSearch(previewSearch)
+    setPrevPageSize(pageSize)
+    setPrevPreview(preview)
     setPage(1)
-  }, [filterTab, previewSearch, pageSize, preview])
+  }
 
   const formatFileSize = bytes => {
     if (!bytes) return '0 B'
@@ -2779,7 +2797,20 @@ function Audit() {
     } catch (e) { setM(errText(e)) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let ignore = false
+    Promise.all([api('/api/s2/audit-logs'), api('/api/users?page=1&per_page=100')])
+      .then(([d, u]) => {
+        if (!ignore) {
+          setItems(d.items || [])
+          setUsers(u.items || [])
+        }
+      })
+      .catch(e => {
+        if (!ignore) setM(errText(e))
+      })
+    return () => { ignore = true }
+  }, [])
 
   return (
     <>
@@ -2833,6 +2864,13 @@ function GenericAdmin({ type }) {
   const [quote, setQuote] = useState({ customer_id:'', product_id:'', quantity:1, discount_percent:0 })
   const [showQuoteModal, setShowQuoteModal] = useState(false)
 
+  const [prevType, setPrevType] = useState(type)
+  if (type !== prevType) {
+    setPrevType(type)
+    setF(cfg.defaults)
+    setEditingId(null)
+  }
+
   async function load() {
     try {
       const base = await api(cfg.url)
@@ -2850,7 +2888,37 @@ function GenericAdmin({ type }) {
       }
     } catch (e) { setM(errText(e)) }
   }
-  useEffect(() => { setF(cfg.defaults); setEditingId(null); load() }, [type])
+
+  useEffect(() => {
+    let ignore = false
+    async function init() {
+      try {
+        const base = await api(cfg.url)
+        if (ignore) return
+        setItems(base.items || [])
+        if (type === 'reasons') {
+          const c = await api('/api/s2/competitors')
+          if (!ignore) setCompetitors(c.items || [])
+        }
+        if (type === 'products') {
+          const [customerResult, quoteResult] = await Promise.allSettled([
+            api('/api/s3/customers'),
+            api('/api/s2/quotations-standard')
+          ])
+          if (!ignore) {
+            if (customerResult.status === 'fulfilled') setCustomers(customerResult.value.items || [])
+            else setM('Không thể tải danh sách khách hàng. Hãy thử tải lại trang.')
+            if (quoteResult.status === 'fulfilled') setQuotes(quoteResult.value.items || [])
+            else setM('Không thể tải danh sách báo giá. Hãy thử tải lại trang.')
+          }
+        }
+      } catch (e) {
+        if (!ignore) setM(errText(e))
+      }
+    }
+    init()
+    return () => { ignore = true }
+  }, [type, cfg.url])
 
   async function submit(e) {
     e.preventDefault()
@@ -3033,7 +3101,16 @@ function GenericAdmin({ type }) {
 function Org() {
   const [items,setItems]=useState([]),[users,setUsers]=useState([]),[f,setF]=useState({name:'',parent_id:'',leader_id:'',region:''}),[m,setM]=useState(''),[editingId,setEditingId]=useState(null)
   async function load(){try{const[a,b]=await Promise.all([api('/api/s2/org-groups'),api('/api/users?page=1&per_page=100')]);setItems(a.items);setUsers(b.items)}catch(e){setM(errText(e))}}
-  useEffect(()=>{load()},[])
+  useEffect(()=>{
+    let ignore = false
+    Promise.all([api('/api/s2/org-groups'),api('/api/users?page=1&per_page=100')]).then(([a,b])=>{
+      if(!ignore){
+        setItems(a.items||[])
+        setUsers(b.items||[])
+      }
+    }).catch(e=>{if(!ignore)setM(errText(e))})
+    return ()=>{ignore = true}
+  },[])
   async function save(e){e.preventDefault();try{const payload={...f,parent_id:f.parent_id?Number(f.parent_id):null,leader_id:f.leader_id?Number(f.leader_id):null};const url=editingId?`/api/s2/org-groups/${editingId}`:'/api/s2/org-groups';setM((await api(url,{method:editingId?'PUT':'POST',body:JSON.stringify(payload)})).message);setF({name:'',parent_id:'',leader_id:'',region:''});setEditingId(null);await load()}catch(e){setM(errText(e))}}
   function edit(x){setEditingId(x.id);setF({name:x.name||'',parent_id:x.parent_id||'',leader_id:x.leader_id||'',region:x.region||''});window.scrollTo({top:0,behavior:'smooth'})}
   return <><form className="panel" onSubmit={save}><h2><ListTree size={20}/> Cơ cấu tổ chức kinh doanh</h2><Notice text={m} type={m&&/không|Hãy|phải/i.test(m)?'err':'ok'}/><div className="grid2"><Field label="Tên nhóm / Phòng ban" value={f.name} onChange={e=>setF({...f,name:e.target.value})} required/><Field label="Khu vực địa lý" value={f.region} onChange={e=>setF({...f,region:e.target.value})} required/><Select label="Nhóm cấp trên" value={f.parent_id} onChange={e=>setF({...f,parent_id:e.target.value})}><option value="">-- Nhóm cấp cao nhất --</option>{items.filter(x=>x.id!==editingId).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</Select><Select label="Trưởng nhóm (bắt buộc)" value={f.leader_id} onChange={e=>setF({...f,leader_id:e.target.value})} required><option value="">-- Chọn trưởng nhóm --</option>{users.map(x=><option key={x.id} value={x.id}>{x.full_name} - {x.email}</option>)}</Select></div><div className="toolbar"><button type="submit" className="primary"><Plus size={16}/>{editingId?'Lưu thay đổi':'Tạo nhóm mới'}</button>{editingId&&<button type="button" className="secondary" onClick={()=>{setEditingId(null);setF({name:'',parent_id:'',leader_id:'',region:''})}}>Hủy sửa</button>}</div><p className="hint">Phạm vi Trưởng nhóm bao gồm nhóm hiện tại và toàn bộ nhóm con trong cây tổ chức.</p></form><div className="panel"><Table headers={['Tên nhóm','Nhóm cấp trên','Trưởng nhóm','Khu vực','Thao tác']} rows={items.map(x=>[x.name,x.parent_name||'-',x.leader_name||'Chưa gán',x.region||'-',<button className="secondary small-btn" onClick={()=>edit(x)}>Sửa / gán trưởng nhóm</button>])}/></div></>
@@ -3054,7 +3131,23 @@ function CrmCustomers({ filterMode = false }) {
       setItems(res.items||[]);setCustomDefs(defs.items||[]);setSaved(sv.items||[]);setCategories((cats.items||[]).filter(x=>x.is_active))
     }catch(e){setM(errText(e))}finally{setLoading(false)}
   }
-  useEffect(()=>{load()},[])
+  useEffect(()=>{
+    let ignore = false
+    Promise.all([
+      api('/api/s3/customers'),
+      api('/api/s2/custom-fields?entity_type=customer'),
+      api('/api/s3/customer-filters'),
+      api('/api/s2/categories')
+    ]).then(([res,defs,sv,cats])=>{
+      if(!ignore){
+        setItems(res.items||[])
+        setCustomDefs(defs.items||[])
+        setSaved(sv.items||[])
+        setCategories((cats.items||[]).filter(x=>x.is_active))
+      }
+    }).catch(e=>{if(!ignore)setM(errText(e))})
+    return ()=>{ignore = true}
+  },[])
 
   async function saveCustomer(e){
     e.preventDefault()
@@ -3122,9 +3215,24 @@ function Customer360() {
       if(cat.status==='fulfilled')setActivityTypes((cat.value.items||[]).filter(x=>x.is_active).map(x=>x.value))
     })
 
-    if(initialCustomerId)setTimeout(()=>load(initialCustomerId),0)
+    if(initialCustomerId){
+      Promise.all([
+        api('/api/s3/customers/'+initialCustomerId+'/360'),
+        api('/api/s3/customers/'+initialCustomerId+'/hierarchy')
+      ]).then(([a,h])=>{
+        if(!alive)return
+        setId(initialCustomerId)
+        setD(a)
+        setHier(h)
+        setM('')
+        if(a?.customer)setCustomers(prev=>prev.some(x=>String(x.id)===String(a.customer.id))?prev:[a.customer,...prev])
+      }).catch(e=>{
+        if(!alive)return
+        setM(errText(e))
+      })
+    }
     return()=>{alive=false}
-  },[])
+  },[initialCustomerId])
   async function load(customerId=id){
     const targetId=String(customerId||'').trim()
     if(!targetId){setM('Hãy chọn một khách hàng để xem hồ sơ 360°.');setD(null);setHier(null);return}
@@ -3336,9 +3444,24 @@ function Customer360() {
 }
 
 function Duplicates() {
-  const [items,setItems]=useState([]),[m,setM]=useState(''),[loading,setLoading]=useState(false),[selected,setSelected]=useState(null)
+  const [items,setItems]=useState([]),[m,setM]=useState(''),[loading,setLoading]=useState(true),[selected,setSelected]=useState(null)
   async function load(){setLoading(true);try{const r=await api('/api/s3/customers/duplicates');setItems(r.items||[]);setM(r.items?.length?`Đã phát hiện ${r.items.length} cặp khách hàng nghi trùng. Hãy mở phần so sánh trước khi gộp.`:'Không phát hiện cặp khách hàng trùng trong phạm vi dữ liệu hiện tại.')}catch(e){setM(errText(e))}finally{setLoading(false)}}
-  useEffect(()=>{load()},[])
+  useEffect(()=>{
+    let ignore = false
+    api('/api/s3/customers/duplicates').then(r=>{
+      if(!ignore){
+        setItems(r.items||[])
+        setM(r.items?.length?`Đã phát hiện ${r.items.length} cặp khách hàng nghi trùng. Hãy mở phần so sánh trước khi gộp.`:'Không phát hiện cặp khách hàng trùng trong phạm vi dữ liệu hiện tại.')
+        setLoading(false)
+      }
+    }).catch(e=>{
+      if(!ignore){
+        setM(errText(e))
+        setLoading(false)
+      }
+    })
+    return ()=>{ignore = true}
+  },[])
   async function merge(keep,dup){if(!confirm(`Giữ "${keep.name}" và gộp toàn bộ dữ liệu của "${dup.name}"?`))return;try{setM((await api('/api/s3/customers/merge',{method:'POST',body:JSON.stringify({keep_id:keep.id,merge_id:dup.id})})).message);setSelected(null);await load()}catch(e){setM(errText(e))}}
 
   const byTax=items.filter(x=>(x.reasons||[]).some(r=>r.includes('mã số thuế'))).length
@@ -3435,7 +3558,7 @@ function Support() {
       // Tương thích với backend/bản dữ liệu cũ: thử endpoint khách hàng đơn giản hơn.
       try {
         customerItems = (await api('/api/customers')).items || []
-      } catch {}
+      } catch (e) { void e }
 
       // Nếu endpoint danh mục người xử lý lỗi, tận dụng ID/người xử lý đang có trong ticket.
       const assigneeMap = new Map()
@@ -3474,7 +3597,74 @@ function Support() {
       setM('Dữ liệu yêu cầu đã tải. Danh mục khách hàng/người xử lý chưa đầy đủ; hãy bấm Tải lại dữ liệu sau khi backend khởi động xong.')
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let ignore = false
+    async function init() {
+      const [supportResult, contextResult] = await Promise.allSettled([
+        api('/api/s3/support'),
+        api('/api/s3/support-context')
+      ])
+      if (ignore) return
+      let supportData = { items: [], churn_risks: [] }
+      if (supportResult.status === 'fulfilled') {
+        supportData = {
+          items: supportResult.value?.items || [],
+          churn_risks: supportResult.value?.churn_risks || []
+        }
+        setD(supportData)
+      } else {
+        setD(supportData)
+        setM(errText(supportResult.reason) || 'Không tải được dữ liệu Hỗ trợ & rủi ro.')
+      }
+
+      let customerItems = []
+      let assigneeItems = []
+
+      if (contextResult.status === 'fulfilled') {
+        customerItems = contextResult.value?.customers || []
+        assigneeItems = contextResult.value?.assignees || []
+      } else {
+        try {
+          customerItems = (await api('/api/customers')).items || []
+        } catch (e) { void e }
+
+        const assigneeMap = new Map()
+        for (const x of supportData.items || []) {
+          if (x.assignee_id && x.assignee_name) {
+            assigneeMap.set(String(x.assignee_id), {
+              id: x.assignee_id,
+              full_name: x.assignee_name,
+              email: ''
+            })
+          }
+        }
+        assigneeItems = Array.from(assigneeMap.values())
+      }
+
+      if (!customerItems.length) {
+        const customerMap = new Map()
+        for (const x of supportData.items || []) {
+          if (x.customer_id && x.customer_name) customerMap.set(String(x.customer_id), { id: x.customer_id, name: x.customer_name })
+        }
+        for (const x of supportData.churn_risks || []) {
+          if (x.id && x.name) customerMap.set(String(x.id), { id: x.id, name: x.name })
+        }
+        customerItems = Array.from(customerMap.values())
+      }
+
+      if (!ignore) {
+        setCustomers(customerItems)
+        setAssignees(assigneeItems)
+        setCid(prev => prev && customerItems.some(x => String(x.id) === String(prev)) ? prev : (customerItems[0]?.id ? String(customerItems[0].id) : ''))
+        setAssigneeId(prev => prev && assigneeItems.some(x => String(x.id) === String(prev)) ? prev : (assigneeItems[0]?.id ? String(assigneeItems[0].id) : ''))
+        if (supportResult.status === 'fulfilled' && (!customerItems.length || !assigneeItems.length)) {
+          setM('Dữ liệu yêu cầu đã tải. Danh mục khách hàng/người xử lý chưa đầy đủ; hãy bấm Tải lại dữ liệu sau khi backend khởi động xong.')
+        }
+      }
+    }
+    init()
+    return () => { ignore = true }
+  }, [])
 
   async function add() {
     if (!cid || !title.trim()) { setM('Hãy chọn khách hàng và nhập nội dung hỗ trợ.'); return }
@@ -3575,7 +3765,13 @@ function Care() {
   async function load() {
     try { setItems((await api('/api/s3/care-list?days=' + days)).items) } catch (e) { setM(errText(e)) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let ignore = false
+    api('/api/s3/care-list?days=30')
+      .then(d => { if (!ignore) setItems(d.items || []) })
+      .catch(e => { if (!ignore) setM(errText(e)) })
+    return () => { ignore = true }
+  }, [])
 
   async function done(id) {
     try {
@@ -3627,7 +3823,22 @@ function UsersPage() {
     } catch (e) { setM(errText(e)) }
   }
 
-  useEffect(() => { load(1) }, [])
+  useEffect(() => {
+    let ignore = false
+    Promise.all([api('/api/users?page=1&per_page=20'), api('/api/meta')])
+      .then(([u, me]) => {
+        if (!ignore) {
+          setItems(u.items || [])
+          setPages(u.pages || 1)
+          setPage(u.page || 1)
+          setMeta(me || { roles: [], groups: [] })
+        }
+      })
+      .catch(e => {
+        if (!ignore) setM(errText(e))
+      })
+    return () => { ignore = true }
+  }, [])
 
   async function create(e) {
     e.preventDefault()
@@ -3746,15 +3957,33 @@ function RolesPage() {
       setUsers(a.items); setMeta(b)
     } catch (e) { setM(errText(e)) }
   }
-  useEffect(() => { load() }, [])
-
-  const selected = users.find(x => x.id === Number(uid))
   useEffect(() => {
+    let ignore = false
+    Promise.all([api('/api/users?page=1&per_page=100'), api('/api/meta')])
+      .then(([a, b]) => {
+        if (!ignore) {
+          setUsers(a.items || [])
+          setMeta(b || { roles: [], groups: [] })
+        }
+      })
+      .catch(e => {
+        if (!ignore) setM(errText(e))
+      })
+    return () => { ignore = true }
+  }, [])
+
+  const [prevUid, setPrevUid] = useState(uid)
+  if (uid !== prevUid) {
+    setPrevUid(uid)
+    const selected = users.find(x => x.id === Number(uid))
     if (selected) {
-      setRoleIds(meta.roles.filter(r => selected.roles.includes(r.code)).map(r => r.id))
+      setRoleIds((meta.roles || []).filter(r => (selected.roles || []).includes(r.code)).map(r => r.id))
       setGid(selected.business_group_id || '')
+    } else {
+      setRoleIds([])
+      setGid('')
     }
-  }, [uid, users, meta.roles])
+  }
 
   async function save() {
     try {
@@ -3806,14 +4035,23 @@ function LockPage() {
       setUsers(u.items); setLogs(l.items)
     } catch (e) { setM(errText(e)) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let ignore = false
+    Promise.all([api('/api/users?page=1&per_page=100'), api('/api/handover-logs')])
+      .then(([u, l]) => {
+        if (!ignore) {
+          setUsers(u.items || [])
+          setLogs(l.items || [])
+        }
+      })
+      .catch(e => {
+        if (!ignore) setM(errText(e))
+      })
+    return () => { ignore = true }
+  }, [])
 
   const targets = users.filter(x => x.is_active && x.status === 'active' && !x.roles.includes('ADMIN'))
   const receivers = users.filter(x => x.is_active && x.status === 'active' && String(x.id) !== String(from) && !x.roles.includes('ADMIN'))
-
-  useEffect(() => {
-    if (to && !receivers.some(x => String(x.id) === String(to))) setTo('')
-  }, [from, users])
 
   async function lock() {
     if (!from) { setM('Hãy chọn tài khoản cần khóa.'); return }
@@ -3950,7 +4188,7 @@ export default function App() {
   }, [user])
 
   async function logout() {
-    try { await api('/api/auth/logout', { method: 'POST' }) } catch {}
+    try { await api('/api/auth/logout', { method: 'POST' }) } catch (e) { void e }
     sessionStorage.removeItem('crm_logged_in')
     setUser(null)
     setMenu([])
