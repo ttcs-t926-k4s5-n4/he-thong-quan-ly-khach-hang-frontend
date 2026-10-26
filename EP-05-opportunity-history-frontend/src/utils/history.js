@@ -8,7 +8,7 @@ export function formatCurrency(value) {
     style: 'currency',
     currency: 'VND',
     maximumFractionDigits: 0,
-  }).format(number);
+  }).format(number).replace(/\u00A0/g, ' ');
 }
 
 export function formatFieldValue(field, value) {

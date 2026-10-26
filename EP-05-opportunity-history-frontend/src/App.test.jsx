@@ -36,9 +36,10 @@ describe('Opportunity history UI', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Thêm cơ hội mới' }));
-    await user.type(screen.getByLabelText(/Tên cơ hội/), 'Cơ hội thử nghiệm');
-    await user.type(screen.getByLabelText(/Tên công ty/), 'Công ty Demo');
-    await user.click(screen.getByRole('button', { name: 'Tạo cơ hội' }));
+    const dialog = screen.getByRole('dialog', { name: 'Thêm cơ hội mới' });
+    await user.type(within(dialog).getByLabelText(/Tên cơ hội/), 'Cơ hội thử nghiệm');
+    await user.type(within(dialog).getByLabelText(/Tên công ty/), 'Công ty Demo');
+    await user.click(within(dialog).getByRole('button', { name: 'Tạo cơ hội' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Đã tạo cơ hội');
     expect(screen.getAllByRole('button', { name: /Xem chi tiết/ })).toHaveLength(14);
   });
