@@ -1,8 +1,9 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+const BASE = import.meta.env.VITE_API_URL || ''
 
 function notifySessionExpired(message){
   // Chỉ chuyển về đăng nhập nếu trước đó người dùng đã đăng nhập trong phiên tab này.
   // Xóa cờ trước khi phát sự kiện để nhiều request song song không phát lặp thông báo.
+  sessionStorage.removeItem('crm_token')
   if(sessionStorage.getItem('crm_logged_in') !== '1') return
   sessionStorage.removeItem('crm_logged_in')
   window.dispatchEvent(new CustomEvent('crm:session-expired',{
@@ -11,29 +12,32 @@ function notifySessionExpired(message){
 }
 
 export async function api(path, options={}){
+  const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('crm_token') : null
+  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {}
+  const reqHeaders = { 'Content-Type': 'application/json', ...authHeaders, ...(options.headers || {}) }
+
   let res
   try {
-    res = await fetch(BASE+path,{
-      credentials:'include',
-      headers:{'Content-Type':'application/json',...(options.headers||{})},
+    res = await fetch((BASE || '') + path, {
+      credentials: 'include',
+      headers: reqHeaders,
       ...options
     })
   } catch {
-    // Retry with 127.0.0.1 if initial fetch failed
-    const altBase = BASE.includes('localhost') ? BASE.replace('localhost', '127.0.0.1') : BASE
+    // Retry with direct 127.0.0.1:5000 if proxy or initial fetch failed
+    const directBase = 'http://127.0.0.1:5000'
     try {
-      res = await fetch(altBase+path,{
-        credentials:'include',
-        headers:{'Content-Type':'application/json',...(options.headers||{})},
+      res = await fetch(directBase + path, {
+        credentials: 'include',
+        headers: reqHeaders,
         ...options
       })
     } catch {
-      // Fallback to active backend port 5000 if port 8000 is unreachable
-      const port5000Base = altBase.includes(':8000') ? altBase.replace(':8000', ':5000') : 'http://127.0.0.1:5000'
+      // Fallback to active backend port 8000 if port 5000 is unreachable
       try {
-        res = await fetch(port5000Base+path,{
-          credentials:'include',
-          headers:{'Content-Type':'application/json',...(options.headers||{})},
+        res = await fetch('http://127.0.0.1:8000' + path, {
+          credentials: 'include',
+          headers: reqHeaders,
           ...options
         })
       } catch {
@@ -59,6 +63,10 @@ export async function api(path, options={}){
     // 401 từ màn hình đăng nhập là sai thông tin đăng nhập, không phải hết phiên.
     if(res.status===401 && path!=='/api/auth/login') notifySessionExpired(message)
     throw new Error(message)
+  }
+  if(path==='/api/auth/login' && data.access_token) {
+    sessionStorage.setItem('crm_token', data.access_token)
+    sessionStorage.setItem('crm_logged_in', '1')
   }
   return data
 }

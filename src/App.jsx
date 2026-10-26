@@ -419,8 +419,14 @@ function Login({ onLogin, initialMessage = '' }) {
   async function submit(x) {
     x.preventDefault()
     try {
-      const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: e, password: p }) })
-      onLogin(d.user, d.menu)
+      const d = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: e, email: e, password: p })
+      })
+      const rawUser = d.user || d
+      const rawRoles = rawUser.roles || (rawUser.role ? [rawUser.role.toUpperCase()] : ['USER'])
+      const userObj = { ...rawUser, roles: rawRoles }
+      onLogin(userObj, d.menu || [])
     } catch (er) {
       setM(errText(er))
     }
@@ -4147,8 +4153,11 @@ export default function App() {
     const handleUserUpdate = () => {
       api('/api/auth/me')
         .then(d => {
-          setUser({ ...d.user, _ts: Date.now() })
-          setMenu(menuForUserFrontend(d.menu, d.user))
+          const rawUser = d.user || d
+          const rawRoles = rawUser.roles || (rawUser.role ? [rawUser.role.toUpperCase()] : ['USER'])
+          const u = { ...rawUser, roles: rawRoles, _ts: Date.now() }
+          setUser(u)
+          setMenu(menuForUserFrontend(d.menu || [], u))
         })
         .catch(() => {})
     }
@@ -4158,8 +4167,11 @@ export default function App() {
     api('/api/auth/me')
       .then(d => {
         sessionStorage.setItem('crm_logged_in', '1')
-        setUser(d.user)
-        setMenu(menuForUserFrontend(d.menu, d.user))
+        const rawUser = d.user || d
+        const rawRoles = rawUser.roles || (rawUser.role ? [rawUser.role.toUpperCase()] : ['USER'])
+        const u = { ...rawUser, roles: rawRoles }
+        setUser(u)
+        setMenu(menuForUserFrontend(d.menu || [], u))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -4190,6 +4202,7 @@ export default function App() {
   async function logout() {
     try { await api('/api/auth/logout', { method: 'POST' }) } catch (e) { void e }
     sessionStorage.removeItem('crm_logged_in')
+    sessionStorage.removeItem('crm_token')
     setUser(null)
     setMenu([])
     go('/')
