@@ -28,7 +28,17 @@ export async function api(path, options={}){
         ...options
       })
     } catch {
-      throw new Error('Không thể kết nối tới máy chủ. Hãy kiểm tra Backend đang chạy tại http://127.0.0.1:8000.')
+      // Fallback to active backend port 5000 if port 8000 is unreachable
+      const port5000Base = altBase.includes(':8000') ? altBase.replace(':8000', ':5000') : 'http://127.0.0.1:5000'
+      try {
+        res = await fetch(port5000Base+path,{
+          credentials:'include',
+          headers:{'Content-Type':'application/json',...(options.headers||{})},
+          ...options
+        })
+      } catch {
+        throw new Error('Không thể kết nối tới máy chủ. Hãy kiểm tra Backend đang chạy tại http://127.0.0.1:5000 hoặc http://127.0.0.1:8000.')
+      }
     }
   }
 
