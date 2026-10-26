@@ -3,16 +3,19 @@
 
 > **KẾT LUẬN TIẾN ĐỘ & MỨC ĐỘ SẴN SÀNG:**  
 > **TOÀN BỘ CÁC LỖI BLOCKER VỀ BUILD (23/23 PASS) VÀ UNIT TEST (80/80 PASS) ĐÃ ĐƯỢC KHẮC PHỤC TRIỆT ĐỂ TẬN GỐC; 23/23 PHÂN HỆ GIAO DIỆN HIỂN THỊ THÀNH CÔNG.**  
-> **TUY NHIÊN, HỆ THỐNG VẪN CHƯA ĐỦ ĐIỀU KIỆN MERGE TRỰC TIẾP LÊN MAIN VÌ TÍCH HỢP BACKEND VẪN ĐANG Ở TRẠNG THÁI BLOCKED.**  
+> **ĐÃ KẾT NỐI VÀ NGHIỆM THU TÍCH HỢP THỰC TẾ THÀNH CÔNG 2 MODULE VỚI BACKEND API (PORT 5000) & CSDL SQLITE TEST: HOẠT ĐỘNG/CÔNG VIỆC (EP-06-NAM) VÀ NHẮC VIỆC (EP-06-CSR103).**  
+> **TUY NHIÊN, HỆ THỐNG VẪN CHƯA ĐỦ ĐIỀU KIỆN MERGE TRỰC TIẾP LÊN MAIN VÌ 20/22 PHÂN HỆ CÒN LẠI VẪN ĐANG Ở TRẠNG THÁI BLOCKED (THIẾU ENDPOINT HOẶC CHƯA NỐI API).**  
 > - **Tiến độ đã đạt được:**  
->   1. **Build: 23/23 ĐẠT (100% PASS)** – Đã khắc phục lỗi import CSS ở Root App (BUG-01) và bổ sung file entrypoint `src/main.jsx` cho `EP-06-CSR103` (BUG-03);  
->   2. **Unit Test: 8/8 Phân hệ có test ĐẠT (80/80 test case PASS, 100%)** – Đã sửa lệch fixture thời gian bằng mốc cố định (BUG-04) và chuẩn hóa ký tự Unicode tiền tệ cùng Web Storage mock (BUG-05);  
->   3. **Linting: 5/5 Submodule cấu hình lint ĐẠT (100% sạch lỗi, exit code 0)** – Đã khắc phục vi phạm React 19 compiler `react-hooks/set-state-in-effect` (BUG-06);  
->   4. **Giao diện: 23/23 Phân hệ hiển thị thành công** – Root App (port 5173) và CSR103 (port 5174) đã render thành công DOM và chạy tương tác trên trình duyệt Chromium.  
+>   1. **Build: 23/23 ĐẠT (100% PASS)** – Khắc phục lỗi CSS Root App (BUG-01) và entrypoint `src/main.jsx` cho `EP-06-CSR103` (BUG-03);  
+>   2. **Unit Test: 8/8 Phân hệ có test ĐẠT (80/80 test case PASS, 100%)** – Sửa lệch fixture thời gian (BUG-04) và chuẩn hóa Unicode tiền tệ / Web Storage (BUG-05);  
+>   3. **Linting: 5/5 Submodule cấu hình lint ĐẠT (100% sạch lỗi, exit code 0)** – Xử lý triệt để 46 lỗi lint Root App theo React Hooks và Flat Config;  
+>   4. **Giao diện: 23/23 Phân hệ hiển thị thành công**;  
+>   5. **Tích hợp Backend thực tế: ĐÃ NỐI VÀ NGHIỆM THU 2 MODULE:**  
+>      - `EP-06-CRM-Activities-Tasks-Nam`: Tải dữ liệu, thêm hoạt động, tạo công việc, hoàn thành và hoãn (kèm lý do $\ge 5$ ký tự), xác thực 422/401/403, lưu CSDL SQLite test (Commit `d9297bc`).  
+>      - `EP-06-CSR103-reminders-frontend`: Tải nhắc việc cá nhân, tạo việc mới, hoàn thành và mở lại đồng bộ CSDL SQLite test (Commit `4d26e79`).  
 > - **Điều kiện chưa đạt (Blocker còn lại):**  
->   1. **22 submodule chạy trên dữ liệu mock trong bộ nhớ**, hoàn toàn chưa có mã nguồn kết nối API tới Backend thật;  
->   2. **Root App cấu hình mặc định gọi tới `http://127.0.0.1:8000`**, trong khi Backend Flask thực tế đang lắng nghe tại cổng `http://127.0.0.1:5000`;  
->   3. Theo nguyên tắc QA độc lập: **Không dùng dữ liệu mock để kết luận tích hợp PASS**. Toàn bộ 23 phân hệ giữ nguyên trạng thái **BLOCKED** về tích hợp thực tế.
+>   1. **20 submodule còn lại tiếp tục giữ trạng thái BLOCKED** do endpoint phía backend chưa được mount lên port 5000 hoặc chưa viết client kết nối;  
+>   2. Theo nguyên tắc QA độc lập: **Không tự ý merge vào main khi các kiểm tra bắt buộc của 20 module còn lại chưa được tích hợp**. Giữ thay đổi trên nhánh `qa/frontend-verification` và đề xuất mở Draft Pull Request.
 
 - **Kỹ sư QA thực hiện:** Đinh Xuân Mạnh
 - **Tài khoản GitHub:** `dtc245200270` (`225133188+dtc245200270@users.noreply.github.com`)
@@ -343,8 +346,8 @@ Kết quả phân loại chi tiết:
 | 5 | `EP-05-opportunity-sharing-frontend` | `GET/POST /api/opportunity-shares` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-97-opportunity-sharing-ownership-backend`)* | Thao tác trên mảng object `mockUsers.js` | ⛔ **BLOCKED** |
 | 6 | `EP-05-Sales-Pipeline-Nam` | `GET/PUT /api/pipeline-stages` | ❌ **MISSING TRÊN 5000** *(Có trong `sprint1/backend/app/pipeline_stages.py`)* | Dùng mock stage trong component state | ⛔ **BLOCKED** |
 | 7 | `EP-05-SCR98-opportunity-documents-frontend` | `GET/POST /api/opportunity-documents` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-98-opportunity-attachments-backend`)* | Lưu danh sách tài liệu đính kèm vào state | ⛔ **BLOCKED** |
-| 8 | `EP-06-CRM-Activities-Tasks-Nam` | `GET/POST /api/tasks`, `/api/activities/quick` | ✅ **ĐÃ CÓ TRÊN 5000** *(HTTP 200 OK)* | Chưa nối client API, vẫn dùng state local | ⛔ **BLOCKED** |
-| 9 | `EP-06-CSR103-reminders-frontend` | `GET/POST /api/tasks/reminders` | ✅ **ĐÃ CÓ TRÊN 5000** *(HTTP 200 OK)* | Lưu cấu hình nhắc việc vào `localStorage` | ⛔ **BLOCKED** |
+| 8 | `EP-06-CRM-Activities-Tasks-Nam` | `GET/POST /api/activities`, `GET/POST /api/tasks`, `/api/tasks/<id>/complete`, `/api/tasks/<id>/postpone`, `/api/lookups/*` | ✅ **HOẠT ĐỘNG THỰC TẾ TRÊN PORT 5000** *(HTTP 200, 201)* | ✅ **Đã kết nối API thật, tải dữ liệu, thêm hoạt động, tạo việc, hoãn và hoàn thành đồng bộ SQLite DB** | 🟢 **INTEGRATED & VERIFIED PASS** (Commit: `d9297bc`) |
+| 9 | `EP-06-CSR103-reminders-frontend` | `GET /api/tasks/reminders`, `GET/POST /api/tasks`, `/api/tasks/<id>/complete`, `/api/tasks/<id>/reopen`, `/api/lookups/*` | ✅ **HOẠT ĐỘNG THỰC TẾ TRÊN PORT 5000** *(HTTP 200, 201)* | ✅ **Đã kết nối API thật, tải nhắc việc cá nhân, tạo/hoàn thành/mở lại việc đồng bộ SQLite DB** | 🟢 **INTEGRATED & VERIFIED PASS** (Commit: `4d26e79`) |
 | 10 | `EP-06-CSR104-call-logging-frontend` | `GET/POST /api/call-logs` | ❌ **MISSING TRÊN 5000** *(Có trong `sprint1/backend/app/call_logs.py`)* | Lưu log cuộc gọi trong RAM | ⛔ **BLOCKED** |
 | 11 | `lead-assignment-sla-Scr85-04` | `GET/POST /api/leads/sla` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-84-lead-accept-reject-sla-backend`)* | Đếm ngược SLA bằng `setInterval` local | ⛔ **BLOCKED** |
 | 12 | `lead-list-filters-Scr86-04` | `GET /api/leads/filters` | ❌ **MISSING TRÊN 5000** *(Có trong `SCRUM-86-lead-filter-saved-backend`)* | Lọc danh sách lead tĩnh | ⛔ **BLOCKED** |
@@ -361,8 +364,85 @@ Kết quả phân loại chi tiết:
 
 ### 7.3. Kết Luận Nguyên Tắc Về Tích Hợp Hệ Thống
 1. **Root CRM App:** Đã giải quyết triệt để phiên đăng nhập thật với Backend port 5000 (xác thực token Bearer, reload session, logout, session expired). Các API `auth/me`, `dashboard/stats` có cơ chế fallback hoạt động ổn định.
-2. **22 Submodule độc lập:** Vẫn đang vận hành hoàn toàn độc lập dưới dạng nguyên mẫu (mock prototype), chưa nối dây API hoặc endpoint phía backend chưa được hợp nhất vào cổng chung 5000.
-3. **Quan điểm QA:** **BẢO LƯU ĐÁNH GIÁ BLOCKED CHO TẤT CẢ 22 SUBMODULE**. Tuyệt đối không kết luận toàn hệ thống PASS khi dữ liệu chưa thực sự lưu vào CSDL Backend.
+2. **2 Submodule đã tích hợp thành công với Backend API thật & CSDL SQLite test (`crm_test_integration.sqlite3`):**
+   - **Module 8 (`EP-06-CRM-Activities-Tasks-Nam`):** Đã kết nối đầy đủ các luồng Hoạt động (SCRUM-99) và Công việc (SCRUM-100), bao gồm tải dữ liệu, thêm mới, hoàn thành, hoãn (kèm lý do $\ge 5$ ký tự), xác thực lỗi 422/401/403 và reload trang đối chiếu dữ liệu. Đạt **PASS**.
+   - **Module 9 (`EP-06-CSR103-reminders-frontend`):** Đã kết nối API nhắc việc (`/api/tasks/reminders`), tải danh sách công việc thực tế, thực hiện hoàn thành (`POST /complete`) và mở lại (`POST /reopen`), tạo việc mới lưu trực tiếp vào CSDL SQLite. Đạt **PASS**.
+3. **20 Submodule còn lại:** Vẫn đang ở dạng nguyên mẫu (mock prototype) do endpoint phía backend chưa được mount hoặc chưa viết client kết nối. Theo quy định QA độc lập: **TIẾP TỤC BẢO LƯU TRẠNG THÁI BLOCKED CHO 20 SUBMODULE CÒN LẠI**.
+
+---
+
+### 7.4. Chi Tiết Kiểm Thử Tích Hợp Thực Tế Cho Module Hoạt Động & Nhắc Việc
+
+Dưới đây là ma trận kết quả kiểm thử thực tế đối chiếu trực tiếp giữa Frontend, Backend REST API (Port 5000) và Cơ sở dữ liệu SQLite test (`instance/crm_test_integration.sqlite3`):
+
+#### A. Module `EP-06-CRM-Activities-Tasks-Nam` (Hoạt động & Công việc)
+- **Commit SHA:** `d9297bc` (`feat(qa/EP-06-nam): ket noi module hoat dong va cong viec voi backend API that`)
+- **Proxy Configuration:** `vite.config.js` proxy `/api` $\rightarrow$ `http://127.0.0.1:5000` (cả dev server và preview server).
+- **Kết quả kiểm thử chi tiết:**
+  1. **TC-EP06-01 (Đăng nhập & Quản lý Token):**
+     - Endpoint: `POST /api/auth/login`
+     - Payload: `{"username":"quantri","password":"123456"}`
+     - Kết quả: `HTTP 200 OK`
+     - Token: `eyJ1aWQiOjd9.at...***` (Masked). Đã lưu vào `sessionStorage` và gửi header `Authorization: Bearer <token>`. Đạt **PASS**.
+  2. **TC-EP06-02 (Tải dữ liệu danh sách & Lookups):**
+     - Endpoint: `GET /api/activities`, `GET /api/tasks?status=all`, `GET /api/lookups/customers`, `GET /api/lookups/users`
+     - Kết quả: `HTTP 200 OK`. Tải thành công 11 activities, 7 tasks, 6 customers, 7 users từ database. Đạt **PASS**.
+  3. **TC-EP06-03 (Thêm hoạt động khách hàng - SCRUM-99):**
+     - Endpoint: `POST /api/activities`
+     - Payload: `{"activity_type":"meeting","customer_id":1,"subject":"Hop danh gia tien do du an CRM","content":"Thong nhat ke hoach trien khai giai doan 2 voi ban giam doc.","outcome":"Ky ket phu luc hop dong","duration_minutes":45}`
+     - Kết quả: `HTTP 201 Created`, Activity ID: `12`.
+     - Đối chiếu DB: Truy vấn SQLite `SELECT id, activity_type, subject FROM activities WHERE id = 12` $\rightarrow$ `(12, 'meeting', 'Hop danh gia tien do du an CRM')`. Đạt **PASS**.
+  4. **TC-EP06-04 (Tạo công việc mới - SCRUM-100):**
+     - Endpoint: `POST /api/tasks`
+     - Payload: `{"title":"Kiem thu tich hop module EP-06 Nam","due_date":"2026-11-05","priority":"urgent","customer_id":1,"assignee_id":7}`
+     - Kết quả: `HTTP 201 Created`, Task ID: `8`.
+     - Đối chiếu DB: `SELECT id, title, status FROM tasks WHERE id = 8` $\rightarrow$ `(8, 'Kiem thu tich hop module EP-06 Nam', 'open')`. Đạt **PASS**.
+  5. **TC-EP06-05 (Đánh dấu hoàn thành công việc):**
+     - Endpoint: `POST /api/tasks/8/complete`
+     - Payload: `{"note":"Hoan thanh kiem thu"}`
+     - Kết quả: `HTTP 200 OK` (`"Đã đánh dấu hoàn thành công việc đúng hạn."`).
+     - Đối chiếu DB: `SELECT status, completed_by FROM tasks WHERE id = 8` $\rightarrow$ `('done', 7)`. Đạt **PASS**.
+  6. **TC-EP06-06 (Hoãn công việc kèm lý do):**
+     - Tạo task test ID `9` (Hạn `2026-11-02`).
+     - Endpoint: `POST /api/tasks/9/postpone`
+     - Payload: `{"new_due_date":"2026-11-10","reason":"Khach hang yeu cau doi lich sang tuan sau"}`
+     - Kết quả: `HTTP 200 OK` (`"Đã hoãn công việc từ 02/11/2026 sang Thứ Ba 10/11/2026."`).
+     - Đối chiếu DB: `SELECT due_date FROM tasks WHERE id = 9` $\rightarrow$ `'2026-11-10'`. Bảng `task_postponements` lưu bản ghi: `old_due_date='2026-11-02'`, `new_due_date='2026-11-10'`, `reason='Khach hang yeu cau doi lich sang tuan sau'`. Đạt **PASS**.
+  7. **TC-EP06-07 (Dữ liệu không hợp lệ & Validation Error):**
+     - Hoãn với lý do ngắn (`reason="abc"`): Trả về `HTTP 422 UNPROCESSABLE ENTITY` (`{"detail":"Lý do hoãn phải có ít nhất 5 ký tự."}`).
+     - Hoãn với hạn mới trước hạn cũ (`new_due_date="2026-11-01"`): Trả về `HTTP 422` (`{"detail":"Hạn mới phải sau hạn hiện tại (02/11/2026)."}`). Đạt **PASS**.
+  8. **TC-EP06-08 (Mất kết nối & Phiên hết hạn):**
+     - Token giả mạo/hết hạn: Backend trả lời `HTTP 401 UNAUTHORIZED` $\rightarrow$ Giao diện tự động xóa token, hiển thị banner cảnh báo và kích hoạt form đăng nhập lại.
+     - Khi ngắt kết nối mạng: Giao diện hiển thị banner cảnh báo tiếng Việt kèm nút "Thử lại". Đạt **PASS**.
+  9. **TC-EP06-09 (Quyền truy cập - RBAC):**
+     - Đăng nhập bằng `nhanvien1` gửi yêu cầu giao việc `POST /api/tasks/1/assign` $\rightarrow$ Trả về `HTTP 403 FORBIDDEN` (`{"detail":"Chỉ Trưởng nhóm trở lên mới được giao lại công việc cho người khác."}`). Đạt **PASS**.
+
+#### B. Module `EP-06-CSR103-reminders-frontend` (Nhắc việc)
+- **Commit SHA:** `4d26e79` (`feat(qa/CSR-103): ket noi module nhac viec voi backend API that`)
+- **Proxy Configuration:** `vite.config.js` proxy `/api` $\rightarrow$ `http://127.0.0.1:5000` (port 5175).
+- **Kết quả kiểm thử chi tiết:**
+  1. **TC-CSR103-01 (Tải danh sách nhắc việc cá nhân):**
+     - Endpoint: `GET /api/tasks/reminders`
+     - Headers: `Authorization: Bearer eyJ1aWQiOjN9.at...***` (Tài khoản `nhanvien1`, user_id: 3)
+     - Kết quả: `HTTP 200 OK` (`{"message":"Bạn có 1 công việc quá hạn.","overdue":[...],"due_today":[...],"due_tomorrow":[...]}`). Đạt **PASS**.
+  2. **TC-CSR103-02 (Tạo công việc từ Modal Nhắc việc):**
+     - Endpoint: `POST /api/tasks`
+     - Payload: `{"title":"Kiem thu CSR103 Nhac viec tu dong","due_date":"2026-10-27","priority":"high","customer_id":1,"assignee_id":3}`
+     - Kết quả: `HTTP 201 Created`, Task ID: `10`. Đạt **PASS**.
+  3. **TC-CSR103-03 (Hoàn thành công việc):**
+     - Endpoint: `POST /api/tasks/10/complete`
+     - Kết quả: `HTTP 200 OK` (`"Đã đánh dấu hoàn thành công việc 'Kiem thu CSR103 Nhac viec tu dong' đúng hạn."`).
+     - Đối chiếu DB: Cột `status='done'`. Đạt **PASS**.
+  4. **TC-CSR103-04 (Mở lại công việc đã hoàn thành):**
+     - Endpoint: `POST /api/tasks/10/reopen`
+     - Kết quả: `HTTP 200 OK` (`"Đã mở lại công việc 'Kiem thu CSR103 Nhac viec tu dong'."`).
+     - Đối chiếu DB: `SELECT id, title, due_date, status FROM tasks WHERE id = 10` $\rightarrow$ `(10, 'Kiem thu CSR103 Nhac viec tu dong', '2026-10-27', 'open')`. Đạt **PASS**.
+  5. **TC-CSR103-05 (Unit Test & Hồi quy logic nhắc việc):**
+     - Lệnh chạy: `node --test src/utils/reminders.test.mjs`
+     - Kết quả: `11/11 tests pass` (100% PASS, 0 fail, 92ms). Đạt **PASS**.
+  6. **TC-CSR103-06 (Production Build):**
+     - Lệnh chạy: `npm run build`
+     - Kết quả: `vite build` tạo bundle sạch trong thư mục `dist/` (0 lỗi, 1.96s). Đạt **PASS**.
 
 ---
 
