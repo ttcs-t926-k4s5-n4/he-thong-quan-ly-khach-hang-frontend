@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, API_BASE } from './api'
 import {
   Users, Plus, Search, Flame, ThermometerSun, Snowflake, Clock3, Check, X, RefreshCw,
   FileSpreadsheet, Download, Upload, Megaphone, Code2, Copy, Merge, Target, Settings2,
-  GitBranch, Save, Trash2, UserCheck, ArrowRightLeft, AlertTriangle, Filter, CalendarDays,
-  BarChart3, Link2, ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  GitBranch, Save, Trash2, UserCheck, ArrowRightLeft, AlertTriangle, Filter,
+  Link2, ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ChevronDown, ChevronUp, Zap
 } from 'lucide-react'
 import './sprint4.css'
@@ -16,7 +16,7 @@ const sourceVi = { web_form:'Biểu mẫu website', website:'Website', danh_thie
 const channelVi = { website:'Website', facebook:'Facebook', google_ads:'Google Ads', email:'Email', zalo:'Zalo', su_kien:'Sự kiện', hoi_thao:'Hội thảo', khac:'Khác' }
 const isErrorMessage = text => !!text && /không|lỗi|thiếu|bắt buộc|hãy|vui lòng|sai|không thể|không tồn tại|hết hạn|từ chối/i.test(String(text))
 
-export const QUICK_SOURCES = [
+const QUICK_SOURCES = [
   { id: 'danh_thiep', label: 'Danh thiếp / Gọi', icon: '📇' },
   { id: 'website', label: 'Website', icon: '🌐' },
   { id: 'facebook', label: 'Facebook', icon: '📘' },
@@ -27,12 +27,19 @@ export const QUICK_SOURCES = [
   { id: 'khac', label: 'Khác', icon: '➕' }
 ]
 
-export const QUICK_INTERESTS = [
+const QUICK_INTERESTS = [
   { id: 'Cao', label: 'Nóng (Cao)', desc: '🔥 Cần gọi ngay', cls: 'hot' },
   { id: 'Trung bình', label: 'Ấm (Vừa)', desc: '⚡ Đang tìm hiểu', cls: 'warm' },
   { id: 'Thấp', label: 'Lạnh (Thấp)', desc: '❄️ Chưa cấp bách', cls: 'cold' }
 ]
 
+const REJECT_QUICK_REASONS = [
+  '📞 Gọi 3 lần không liên lạc được',
+  '❌ Sai số điện thoại / Không đúng người',
+  '🚫 Không có nhu cầu sử dụng',
+  '🏢 Đã mua của đối thủ cạnh tranh',
+  '💰 Ngân sách chưa phù hợp'
+]
 
 function Notice({text,type='ok'}){if(!text)return null;return <div className={`s4-notice ${type}`}>{type==='err'?<AlertTriangle size={17}/>:<Check size={17}/>}<span>{text}</span></div>}
 function Card({title,subtitle='',icon:Icon=Target,children,actions=null}){return <section className="s4-card"><header className="s4-card-head"><div className="s4-title-wrap"><span className="s4-icon"><Icon size={20}/></span><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div></div>{actions&&<div className="s4-head-actions">{actions}</div>}</header>{children}</section>}
@@ -41,7 +48,7 @@ function Btn({children,onClick,kind='primary',disabled=false,type='button'}){ret
 function Badge({children,tone='blue'}){return <span className={`s4-badge ${tone}`}>{children}</span>}
 function Empty({text='Chưa có dữ liệu.'}){return <div className="s4-empty">{text}</div>}
 
-async function upload(path,form){const r=await fetch(API_BASE+path,{method:'POST',credentials:'include',body:form});let d={};try{d=await r.json()}catch{};if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:(d.message||'Yêu cầu không thành công.'));return d}
+async function upload(path,form){const r=await fetch(API_BASE+path,{method:'POST',credentials:'include',body:form});let d={};try{d=await r.json()}catch(e){void e};if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:(d.message||'Yêu cầu không thành công.'));return d}
 
 function Classification({value}){const Icon=value==='hot'?Flame:value==='warm'?ThermometerSun:Snowflake;return <Badge tone={value==='hot'?'red':value==='warm'?'amber':'blue'}><Icon size={13}/>{clsVi[value]||value}</Badge>}
 function SLA({value}){return value==='breached'?<Badge tone="red"><AlertTriangle size={13}/>Quá SLA</Badge>:value==='warning'?<Badge tone="amber"><Clock3 size={13}/>Sắp quá SLA</Badge>:value==='not_assigned'?<Badge tone="gray">Chưa phân</Badge>:<Badge tone="green"><Check size={13}/>Trong SLA</Badge>}
@@ -178,13 +185,21 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
   // Web forms list inside modal
   const [formsList, setFormsList] = useState([])
   const [copiedCode, setCopiedCode] = useState(false)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (isOpen) {
+      setM('')
+      setErr(false)
+    }
+  }
 
   useEffect(() => {
     if (isOpen) {
-      api('/api/s4/lead-options').then(setOpts).catch(() => {})
-      api('/api/s4/forms').then(d => setFormsList(d.items || [])).catch(() => {})
-      setM('')
-      setErr(false)
+      let ignore = false
+      api('/api/s4/lead-options').then(d => { if (!ignore) setOpts(d) }).catch(() => {})
+      api('/api/s4/forms').then(d => { if (!ignore) setFormsList(d.items || []) }).catch(() => {})
+      return () => { ignore = true }
     }
   }, [isOpen])
 
@@ -601,19 +616,15 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
 }
 
 export function RejectLeadModal({ isOpen, lead, onClose, onConfirm }) {
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState(REJECT_QUICK_REASONS[0])
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (isOpen) {
+      setReason(REJECT_QUICK_REASONS[0])
+    }
+  }
   const [submitting, setSubmitting] = useState(false)
-  const QUICK_REASONS = [
-    '📞 Gọi 3 lần không liên lạc được',
-    '❌ Sai số điện thoại / Không đúng người',
-    '🚫 Không có nhu cầu sử dụng',
-    '🏢 Đã mua của đối thủ cạnh tranh',
-    '💰 Ngân sách chưa phù hợp'
-  ]
-
-  useEffect(() => {
-    if (isOpen) setReason(QUICK_REASONS[0])
-  }, [isOpen])
 
   if (!isOpen || !lead) return null
 
@@ -654,7 +665,7 @@ export function RejectLeadModal({ isOpen, lead, onClose, onConfirm }) {
           <div className="s4-opt-section">
             <div className="s4-opt-label"><span>Lý do nhanh:</span></div>
             <div className="s4-tag-selector">
-              {QUICK_REASONS.map(r => (
+              {REJECT_QUICK_REASONS.map(r => (
                 <button
                   key={r}
                   type="button"
@@ -816,14 +827,49 @@ export function LeadPage({user}){
     }
   }
 
-  async function loadSaved(){try{setSaved((await api('/api/s4/saved-filters')).items||[])}catch{}}
-  async function loadOpts(){try{setOpts(await api('/api/s4/lead-options'))}catch{}}
+  async function loadSaved(){try{setSaved((await api('/api/s4/saved-filters')).items||[])}catch(e){void e}}
+
+  const filtersRef = useRef(filters)
+  const perPageRef = useRef(perPage)
+  const loadRef = useRef(load)
+
+  useEffect(() => {
+    filtersRef.current = filters
+    perPageRef.current = perPage
+    loadRef.current = load
+  })
 
   useEffect(()=>{
-    load();loadSaved();loadOpts();
-    const handleLeadCreated = () => { load(filters, 1, perPage); setPage(1); }
+    let ignore = false
+    async function init() {
+      try {
+        const [d, s, o] = await Promise.all([
+          api('/api/s4/leads?page=1&per_page=7'),
+          api('/api/s4/saved-filters').catch(() => ({ items: [] })),
+          api('/api/s4/lead-options').catch(() => ({}))
+        ])
+        if (!ignore) {
+          setData(d)
+          setSaved(s.items || [])
+          setOpts(o)
+          setErr(false)
+          setLoadingLeads(false)
+        }
+      } catch (e) {
+        if (!ignore) {
+          setM(msg(e))
+          setErr(true)
+          setLoadingLeads(false)
+        }
+      }
+    }
+    init()
+    const handleLeadCreated = () => { loadRef.current(filtersRef.current, 1, perPageRef.current); setPage(1) }
     window.addEventListener('crm:lead-created', handleLeadCreated)
-    return () => window.removeEventListener('crm:lead-created', handleLeadCreated)
+    return () => {
+      ignore = true
+      window.removeEventListener('crm:lead-created', handleLeadCreated)
+    }
   },[])
 
   function setF(k,v){setFilters(x=>({...x,[k]:v}))}
@@ -1015,13 +1061,13 @@ export function LeadImportPage(){
   </div>
 }
 
-export function CampaignPage(){const[i,setI]=useState([]),[f,setF]=useState({name:'',channel:'website',budget:'',start_date:'',end_date:'',description:''}),[m,setM]=useState('');async function load(){try{setI((await api('/api/s4/campaigns')).items||[])}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);async function add(){try{setM((await api('/api/s4/campaigns',{method:'POST',body:JSON.stringify({...f,budget:Number(f.budget)||0})})).message);setF({name:'',channel:'website',budget:'',start_date:'',end_date:'',description:''});load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Chiến dịch Marketing</h1><p>Đo số Lead, cơ hội và giá trị đã chốt theo từng chiến dịch.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Khai báo chiến dịch" icon={Megaphone}><div className="s4-grid cols-3"><Field label="Tên chiến dịch"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field><Field label="Kênh"><select value={f.channel} onChange={e=>setF({...f,channel:e.target.value})}><option value="website">Website</option><option value="facebook">Facebook</option><option value="google_ads">Google Ads</option><option value="email">Email</option><option value="zalo">Zalo</option><option value="su_kien">Sự kiện</option><option value="hoi_thao">Hội thảo</option><option value="khac">Khác</option></select></Field><Field label="Ngân sách"><input type="number" value={f.budget} onChange={e=>setF({...f,budget:e.target.value})}/></Field><Field label="Ngày bắt đầu"><input type="date" value={f.start_date} onChange={e=>setF({...f,start_date:e.target.value})}/></Field><Field label="Ngày kết thúc"><input type="date" value={f.end_date} onChange={e=>setF({...f,end_date:e.target.value})}/></Field><Field label="Mô tả"><input value={f.description} onChange={e=>setF({...f,description:e.target.value})}/></Field></div><div className="s4-actions"><Btn onClick={add}><Plus size={16}/>Tạo chiến dịch</Btn></div></Card>{!i.length?<Empty text="Chưa có chiến dịch Marketing. Hãy tạo chiến dịch đầu tiên ở biểu mẫu phía trên."/>:<div className="s4-stat-grid">{i.map(x=><div className="s4-stat-card" key={x.id}><div className="s4-stat-top"><Megaphone size={18}/><Badge tone={x.status==='Đang chạy'?'green':x.status==='Đã kết thúc'?'gray':'blue'}>{x.status}</Badge></div><h3>{x.name}</h3><p>{channelVi[x.channel]||x.channel} · {x.start_date||'-'} → {x.end_date||'-'}</p><div className="s4-metrics"><span><b>{x.lead_count}</b> Lead</span><span><b>{x.opportunity_count}</b> Cơ hội</span><span><b>{money(x.closed_value)}</b> Đã chốt</span></div><small>Ngân sách: {money(x.budget)}</small></div>)}</div>}</div>}
+export function CampaignPage(){const[i,setI]=useState([]),[f,setF]=useState({name:'',channel:'website',budget:'',start_date:'',end_date:'',description:''}),[m,setM]=useState('');async function load(){try{setI((await api('/api/s4/campaigns')).items||[])}catch(e){setM(msg(e))}}useEffect(()=>{let ignore=false;api('/api/s4/campaigns').then(d=>{if(!ignore)setI(d.items||[])}).catch(e=>{if(!ignore)setM(msg(e))});return()=>{ignore=true}},[]);async function add(){try{setM((await api('/api/s4/campaigns',{method:'POST',body:JSON.stringify({...f,budget:Number(f.budget)||0})})).message);setF({name:'',channel:'website',budget:'',start_date:'',end_date:'',description:''});load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Chiến dịch Marketing</h1><p>Đo số Lead, cơ hội và giá trị đã chốt theo từng chiến dịch.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Khai báo chiến dịch" icon={Megaphone}><div className="s4-grid cols-3"><Field label="Tên chiến dịch"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field><Field label="Kênh"><select value={f.channel} onChange={e=>setF({...f,channel:e.target.value})}><option value="website">Website</option><option value="facebook">Facebook</option><option value="google_ads">Google Ads</option><option value="email">Email</option><option value="zalo">Zalo</option><option value="su_kien">Sự kiện</option><option value="hoi_thao">Hội thảo</option><option value="khac">Khác</option></select></Field><Field label="Ngân sách"><input type="number" value={f.budget} onChange={e=>setF({...f,budget:e.target.value})}/></Field><Field label="Ngày bắt đầu"><input type="date" value={f.start_date} onChange={e=>setF({...f,start_date:e.target.value})}/></Field><Field label="Ngày kết thúc"><input type="date" value={f.end_date} onChange={e=>setF({...f,end_date:e.target.value})}/></Field><Field label="Mô tả"><input value={f.description} onChange={e=>setF({...f,description:e.target.value})}/></Field></div><div className="s4-actions"><Btn onClick={add}><Plus size={16}/>Tạo chiến dịch</Btn></div></Card>{!i.length?<Empty text="Chưa có chiến dịch Marketing. Hãy tạo chiến dịch đầu tiên ở biểu mẫu phía trên."/>:<div className="s4-stat-grid">{i.map(x=><div className="s4-stat-card" key={x.id}><div className="s4-stat-top"><Megaphone size={18}/><Badge tone={x.status==='Đang chạy'?'green':x.status==='Đã kết thúc'?'gray':'blue'}>{x.status}</Badge></div><h3>{x.name}</h3><p>{channelVi[x.channel]||x.channel} · {x.start_date||'-'} → {x.end_date||'-'}</p><div className="s4-metrics"><span><b>{x.lead_count}</b> Lead</span><span><b>{x.opportunity_count}</b> Cơ hội</span><span><b>{money(x.closed_value)}</b> Đã chốt</span></div><small>Ngân sách: {money(x.budget)}</small></div>)}</div>}</div>}
 
-export function LeadFormsPage(){const[i,setI]=useState([]),[c,setC]=useState([]),[f,setF]=useState({name:'',source_name:'Website',campaign_id:'',allowed_domains:''}),[m,setM]=useState(''),[code,setCode]=useState(null),[page,setPage]=useState(1);async function load(){try{setI((await api('/api/s4/forms')).items||[]);setC((await api('/api/s4/campaigns')).items||[])}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);async function add(){try{const d=await api('/api/s4/forms',{method:'POST',body:JSON.stringify({name:f.name,source_name:f.source_name,campaign_id:f.campaign_id?Number(f.campaign_id):null,allowed_domains:f.allowed_domains.split(',').map(x=>x.trim()).filter(Boolean),is_active:true})});setCode(d);setM(d.message);load()}catch(e){setM(msg(e))}}function copy(t){navigator.clipboard?.writeText(t);setM('Đã sao chép mã nhúng.')}async function toggle(id){try{setM((await api(`/api/s4/forms/${id}/toggle`,{method:'POST'})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Biểu mẫu nhúng Website</h1><p>Tạo form có chống spam, giới hạn IP và gắn đúng nguồn/chiến dịch.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Tạo biểu mẫu" icon={Code2}><div className="s4-grid cols-3"><Field label="Tên biểu mẫu"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field><Field label="Nguồn"><input value={f.source_name} onChange={e=>setF({...f,source_name:e.target.value})}/></Field><Field label="Chiến dịch"><select value={f.campaign_id} onChange={e=>setF({...f,campaign_id:e.target.value})}><option value="">Không gắn</option>{c.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></Field><Field label="Tên miền cho phép (cách nhau dấu phẩy)"><input placeholder="example.com, landing.example.com" value={f.allowed_domains} onChange={e=>setF({...f,allowed_domains:e.target.value})}/></Field></div><div className="s4-actions"><Btn onClick={add}><Plus size={16}/>Sinh mã nhúng</Btn></div>{code&&<div className="s4-code-grid"><div><b>Script</b><code>{code.script}</code><Btn kind="soft" onClick={()=>copy(code.script)}><Copy size={14}/>Sao chép</Btn></div><div><b>Iframe</b><code>{code.iframe}</code><Btn kind="soft" onClick={()=>copy(code.iframe)}><Copy size={14}/>Sao chép</Btn></div></div>}</Card><Card title="Biểu mẫu đã tạo" icon={Link2}>{!i.length?<Empty/>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Tên</th><th>Nguồn</th><th>Chiến dịch</th><th>Lead</th><th>Trạng thái</th><th>Trang demo</th><th>Thao tác</th></tr></thead><tbody>{i.slice((page-1)*7,page*7).map(x=><tr key={x.id}><td><b>{x.name}</b><small>{x.public_key}</small></td><td>{x.source_name}</td><td>{x.campaign_name||'-'}</td><td>{x.lead_count}</td><td><Badge tone={x.is_active?'green':'gray'}>{x.is_active?'Đang bật':'Đã tắt'}</Badge></td><td><a className="s4-link" target="_blank" rel="noreferrer" href={`${API_BASE}/embed/${x.public_key}/page`}>Mở form</a></td><td><button className="s4-inline-btn" onClick={()=>toggle(x.id)}>{x.is_active?'Tắt':'Bật'}</button></td></tr>)}</tbody></table></div>{i.length>7&&<Pagination currentPage={page} totalItems={i.length} pageSize={7} onPageChange={setPage}/>}</>}</Card></div>}
+export function LeadFormsPage(){const[i,setI]=useState([]),[c,setC]=useState([]),[f,setF]=useState({name:'',source_name:'Website',campaign_id:'',allowed_domains:''}),[m,setM]=useState(''),[code,setCode]=useState(null),[page,setPage]=useState(1);async function load(){try{setI((await api('/api/s4/forms')).items||[]);setC((await api('/api/s4/campaigns')).items||[])}catch(e){setM(msg(e))}}useEffect(()=>{let ignore=false;Promise.all([api('/api/s4/forms'),api('/api/s4/campaigns')]).then(([forms,camps])=>{if(!ignore){setI(forms.items||[]);setC(camps.items||[])}}).catch(e=>{if(!ignore)setM(msg(e))});return()=>{ignore=true}},[]);async function add(){try{const d=await api('/api/s4/forms',{method:'POST',body:JSON.stringify({name:f.name,source_name:f.source_name,campaign_id:f.campaign_id?Number(f.campaign_id):null,allowed_domains:f.allowed_domains.split(',').map(x=>x.trim()).filter(Boolean),is_active:true})});setCode(d);setM(d.message);load()}catch(e){setM(msg(e))}}function copy(t){navigator.clipboard?.writeText(t);setM('Đã sao chép mã nhúng.')}async function toggle(id){try{setM((await api(`/api/s4/forms/${id}/toggle`,{method:'POST'})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Biểu mẫu nhúng Website</h1><p>Tạo form có chống spam, giới hạn IP và gắn đúng nguồn/chiến dịch.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Tạo biểu mẫu" icon={Code2}><div className="s4-grid cols-3"><Field label="Tên biểu mẫu"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field><Field label="Nguồn"><input value={f.source_name} onChange={e=>setF({...f,source_name:e.target.value})}/></Field><Field label="Chiến dịch"><select value={f.campaign_id} onChange={e=>setF({...f,campaign_id:e.target.value})}><option value="">Không gắn</option>{c.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></Field><Field label="Tên miền cho phép (cách nhau dấu phẩy)"><input placeholder="example.com, landing.example.com" value={f.allowed_domains} onChange={e=>setF({...f,allowed_domains:e.target.value})}/></Field></div><div className="s4-actions"><Btn onClick={add}><Plus size={16}/>Sinh mã nhúng</Btn></div>{code&&<div className="s4-code-grid"><div><b>Script</b><code>{code.script}</code><Btn kind="soft" onClick={()=>copy(code.script)}><Copy size={14}/>Sao chép</Btn></div><div><b>Iframe</b><code>{code.iframe}</code><Btn kind="soft" onClick={()=>copy(code.iframe)}><Copy size={14}/>Sao chép</Btn></div></div>}</Card><Card title="Biểu mẫu đã tạo" icon={Link2}>{!i.length?<Empty/>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Tên</th><th>Nguồn</th><th>Chiến dịch</th><th>Lead</th><th>Trạng thái</th><th>Trang demo</th><th>Thao tác</th></tr></thead><tbody>{i.slice((page-1)*7,page*7).map(x=><tr key={x.id}><td><b>{x.name}</b><small>{x.public_key}</small></td><td>{x.source_name}</td><td>{x.campaign_name||'-'}</td><td>{x.lead_count}</td><td><Badge tone={x.is_active?'green':'gray'}>{x.is_active?'Đang bật':'Đã tắt'}</Badge></td><td><a className="s4-link" target="_blank" rel="noreferrer" href={`${API_BASE}/embed/${x.public_key}/page`}>Mở form</a></td><td><button className="s4-inline-btn" onClick={()=>toggle(x.id)}>{x.is_active?'Tắt':'Bật'}</button></td></tr>)}</tbody></table></div>{i.length>7&&<Pagination currentPage={page} totalItems={i.length} pageSize={7} onPageChange={setPage}/>}</>}</Card></div>}
 
-export function LeadDuplicatesPage(){const[d,setD]=useState({pairs:[],customer_suggestions:[]}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/leads/duplicates'))}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);async function merge(a,b){if(!confirm(`Gộp lead #${b} vào #${a}?`))return;try{setM((await api('/api/s4/leads/merge',{method:'POST',body:JSON.stringify({keep_id:a,merge_id:b})})).message);load()}catch(e){setM(msg(e))}}async function linkCustomer(lid,cid){try{setM((await api(`/api/s4/leads/${lid}/link-customer/${cid}`,{method:'POST'})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Phát hiện & gộp Lead trùng</h1><p>Đối chiếu email, số điện thoại, tên công ty và gợi ý khách hàng đã tồn tại.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Cặp Lead nghi trùng" icon={Merge}>{!d.pairs?.length?<Empty text="Chưa phát hiện cặp Lead trùng."/>:<div className="s4-duplicate-grid">{d.pairs.map((p,n)=><div className="s4-compare" key={n}><div><Badge tone="blue">Bản giữ lại A</Badge><h3>{p.a.full_name}</h3><p>{p.a.email||'-'} · {p.a.phone||'-'}</p><small>{p.a.company||'-'}</small></div><div className="s4-merge-arrow"><Merge size={22}/><span>{p.reasons.join(', ')}</span></div><div><Badge tone="amber">Bản gộp B</Badge><h3>{p.b.full_name}</h3><p>{p.b.email||'-'} · {p.b.phone||'-'}</p><small>{p.b.company||'-'}</small></div><Btn onClick={()=>merge(p.a.id,p.b.id)}><Merge size={15}/>Gộp</Btn></div>)}</div>}</Card><Card title="Lead trùng với khách hàng đã có" icon={ShieldCheck}>{!d.customer_suggestions?.length?<Empty text="Chưa có gợi ý liên kết khách hàng."/>:<div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Khách hàng hiện có</th><th>Thao tác</th></tr></thead><tbody>{d.customer_suggestions.map((x,n)=><tr key={n}><td>{x.lead.full_name} · {x.lead.company}</td><td>#{x.customer.id} {x.customer.name}</td><td><button className="s4-inline-btn" onClick={()=>linkCustomer(x.lead.id,x.customer.id)}>Gắn khách hàng</button></td></tr>)}</tbody></table></div>}</Card></div>}
+export function LeadDuplicatesPage(){const[d,setD]=useState({pairs:[],customer_suggestions:[]}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/leads/duplicates'))}catch(e){setM(msg(e))}}useEffect(()=>{let ignore=false;api('/api/s4/leads/duplicates').then(data=>{if(!ignore)setD(data)}).catch(e=>{if(!ignore)setM(msg(e))});return()=>{ignore=true}},[]);async function merge(a,b){if(!confirm(`Gộp lead #${b} vào #${a}?`))return;try{setM((await api('/api/s4/leads/merge',{method:'POST',body:JSON.stringify({keep_id:a,merge_id:b})})).message);load()}catch(e){setM(msg(e))}}async function linkCustomer(lid,cid){try{setM((await api(`/api/s4/leads/${lid}/link-customer/${cid}`,{method:'POST'})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Phát hiện & gộp Lead trùng</h1><p>Đối chiếu email, số điện thoại, tên công ty và gợi ý khách hàng đã tồn tại.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Cặp Lead nghi trùng" icon={Merge}>{!d.pairs?.length?<Empty text="Chưa phát hiện cặp Lead trùng."/>:<div className="s4-duplicate-grid">{d.pairs.map((p,n)=><div className="s4-compare" key={n}><div><Badge tone="blue">Bản giữ lại A</Badge><h3>{p.a.full_name}</h3><p>{p.a.email||'-'} · {p.a.phone||'-'}</p><small>{p.a.company||'-'}</small></div><div className="s4-merge-arrow"><Merge size={22}/><span>{p.reasons.join(', ')}</span></div><div><Badge tone="amber">Bản gộp B</Badge><h3>{p.b.full_name}</h3><p>{p.b.email||'-'} · {p.b.phone||'-'}</p><small>{p.b.company||'-'}</small></div><Btn onClick={()=>merge(p.a.id,p.b.id)}><Merge size={15}/>Gộp</Btn></div>)}</div>}</Card><Card title="Lead trùng với khách hàng đã có" icon={ShieldCheck}>{!d.customer_suggestions?.length?<Empty text="Chưa có gợi ý liên kết khách hàng."/>:<div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Khách hàng hiện có</th><th>Thao tác</th></tr></thead><tbody>{d.customer_suggestions.map((x,n)=><tr key={n}><td>{x.lead.full_name} · {x.lead.company}</td><td>#{x.customer.id} {x.customer.name}</td><td><button className="s4-inline-btn" onClick={()=>linkCustomer(x.lead.id,x.customer.id)}>Gắn khách hàng</button></td></tr>)}</tbody></table></div>}</Card></div>}
 
-export function LeadScoringPage(){const[d,setD]=useState({rules:[],hot_min:70,warm_min:40}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/scoring'))}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);function addRule(){setD(x=>({...x,rules:[...x.rules,{criterion:'industry',match_value:'',points:10,sort_order:x.rules.length+1}]}))}function upd(n,k,v){setD(x=>({...x,rules:x.rules.map((r,i)=>i===n?{...r,[k]:v}:r)}))}async function save(){try{setM((await api('/api/s4/scoring',{method:'PUT',body:JSON.stringify({hot_min:Number(d.hot_min),warm_min:Number(d.warm_min),rules:d.rules.map(r=>({...r,points:Number(r.points),sort_order:Number(r.sort_order)}))})})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Chấm điểm Lead</h1><p>Cấu hình tiêu chí và ngưỡng Nóng / Ấm / Lạnh; điểm chỉ quyết định thứ tự ưu tiên.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Ngưỡng phân loại" icon={Target}><div className="s4-grid cols-3"><Field label="Nóng từ"><input type="number" value={d.hot_min} onChange={e=>setD({...d,hot_min:e.target.value})}/></Field><Field label="Ấm từ"><input type="number" value={d.warm_min} onChange={e=>setD({...d,warm_min:e.target.value})}/></Field></div></Card><Card title="Tiêu chí tính điểm" icon={Settings2} actions={<Btn kind="soft" onClick={addRule}><Plus size={15}/>Thêm tiêu chí</Btn>}><div className="s4-rule-list">{d.rules.map((r,n)=><div className="s4-rule" key={n}><select value={r.criterion} onChange={e=>upd(n,'criterion',e.target.value)}><option value="industry">Ngành nghề</option><option value="company_size">Quy mô</option><option value="source">Nguồn</option><option value="interest_level">Mức quan tâm</option></select><input placeholder="Giá trị khớp" value={r.match_value} onChange={e=>upd(n,'match_value',e.target.value)}/><input type="number" value={r.points} onChange={e=>upd(n,'points',e.target.value)}/><button type="button" onClick={()=>setD(x=>({...x,rules:x.rules.filter((_,i)=>i!==n)}))}><Trash2 size={16}/></button></div>)}</div><div className="s4-actions"><Btn onClick={save}><Save size={16}/>Lưu & tính lại toàn bộ Lead</Btn></div></Card></div>}
+export function LeadScoringPage(){const[d,setD]=useState({rules:[],hot_min:70,warm_min:40}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/scoring'))}catch(e){setM(msg(e))}}useEffect(()=>{let ignore=false;api('/api/s4/scoring').then(data=>{if(!ignore)setD(data)}).catch(e=>{if(!ignore)setM(msg(e))});return()=>{ignore=true}},[]);function addRule(){setD(x=>({...x,rules:[...x.rules,{criterion:'industry',match_value:'',points:10,sort_order:x.rules.length+1}]}))}function upd(n,k,v){setD(x=>({...x,rules:x.rules.map((r,i)=>i===n?{...r,[k]:v}:r)}))}async function save(){try{setM((await api('/api/s4/scoring',{method:'PUT',body:JSON.stringify({hot_min:Number(d.hot_min),warm_min:Number(d.warm_min),rules:d.rules.map(r=>({...r,points:Number(r.points),sort_order:Number(r.sort_order)}))})})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Chấm điểm Lead</h1><p>Cấu hình tiêu chí và ngưỡng Nóng / Ấm / Lạnh; điểm chỉ quyết định thứ tự ưu tiên.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Ngưỡng phân loại" icon={Target}><div className="s4-grid cols-3"><Field label="Nóng từ"><input type="number" value={d.hot_min} onChange={e=>setD({...d,hot_min:e.target.value})}/></Field><Field label="Ấm từ"><input type="number" value={d.warm_min} onChange={e=>setD({...d,warm_min:e.target.value})}/></Field></div></Card><Card title="Tiêu chí tính điểm" icon={Settings2} actions={<Btn kind="soft" onClick={addRule}><Plus size={15}/>Thêm tiêu chí</Btn>}><div className="s4-rule-list">{d.rules.map((r,n)=><div className="s4-rule" key={n}><select value={r.criterion} onChange={e=>upd(n,'criterion',e.target.value)}><option value="industry">Ngành nghề</option><option value="company_size">Quy mô</option><option value="source">Nguồn</option><option value="interest_level">Mức quan tâm</option></select><input placeholder="Giá trị khớp" value={r.match_value} onChange={e=>upd(n,'match_value',e.target.value)}/><input type="number" value={r.points} onChange={e=>upd(n,'points',e.target.value)}/><button type="button" onClick={()=>setD(x=>({...x,rules:x.rules.filter((_,i)=>i!==n)}))}><Trash2 size={16}/></button></div>)}</div><div className="s4-actions"><Btn onClick={save}><Save size={16}/>Lưu & tính lại toàn bộ Lead</Btn></div></Card></div>}
 
 export function LeadAssignmentPage({user}){
   const roles=new Set(user?.roles||[])
@@ -1050,7 +1096,37 @@ export function LeadAssignmentPage({user}){
     }catch(e){setM(msg(e))}
     finally{setLoading(false)}
   }
-  useEffect(()=>{load()},[canConfigure,user?.group_name])
+  useEffect(()=>{
+    let ignore = false
+    async function init() {
+      try{
+        const q=await api('/api/s4/assignment-queue')
+        if(canConfigure){
+          const cfg=await api('/api/s4/assignment-rules')
+          if(!ignore){
+            setQueue(q.items||[])
+            setD(cfg)
+            setLoading(false)
+          }
+        }else{
+          const opts=await api('/api/s4/lead-options')
+          const users=(opts.users||[]).filter(x=>!user?.group_name||x.group_name===user.group_name)
+          if(!ignore){
+            setQueue(q.items||[])
+            setD({items:[],users,groups:[]})
+            setLoading(false)
+          }
+        }
+      }catch(e){
+        if(!ignore){
+          setM(msg(e))
+          setLoading(false)
+        }
+      }
+    }
+    init()
+    return ()=>{ignore=true}
+  },[canConfigure,user?.group_name])
 
   async function assign(id){
     const uid=Number(sel[id])
