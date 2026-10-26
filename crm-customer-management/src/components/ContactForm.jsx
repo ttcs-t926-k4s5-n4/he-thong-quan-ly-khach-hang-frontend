@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, Save, UserRound } from "lucide-react";
 
 const emptyForm = {
@@ -18,28 +18,33 @@ function ContactForm({
   onSave,
   onClose,
 }) {
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState(() => (contact ? {
+    name: contact.name || "",
+    position: contact.position || "",
+    email: contact.email || "",
+    phone: contact.phone || "",
+    role: contact.role || "người quyết định",
+    customerId: String(contact.customerId || ""),
+    isPrimary: Boolean(contact.isPrimary),
+  } : emptyForm));
+  const [prevContact, setPrevContact] = useState(contact);
   const [error, setError] = useState("");
 
   const isEditing = Boolean(contact);
 
-  useEffect(() => {
-    if (contact) {
-      setFormData({
-        name: contact.name || "",
-        position: contact.position || "",
-        email: contact.email || "",
-        phone: contact.phone || "",
-        role: contact.role || "người quyết định",
-        customerId: String(contact.customerId || ""),
-        isPrimary: Boolean(contact.isPrimary),
-      });
-    } else {
-      setFormData(emptyForm);
-    }
-
+  if (contact !== prevContact) {
+    setPrevContact(contact);
+    setFormData(contact ? {
+      name: contact.name || "",
+      position: contact.position || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      role: contact.role || "người quyết định",
+      customerId: String(contact.customerId || ""),
+      isPrimary: Boolean(contact.isPrimary),
+    } : emptyForm);
     setError("");
-  }, [contact]);
+  }
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, UserPlus, UserRound } from "lucide-react";
 
 function ContactForm({
@@ -8,64 +8,43 @@ function ContactForm({
   onSave,
   onClose,
 }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    position: "",
-    email: "",
-    phone: "",
-    role: "người ảnh hưởng",
-    customerId:
-      customers?.[0]?.id
-        ? String(customers[0].id)
-        : "",
-    isPrimary: false,
-  });
-
-  const [error, setError] = useState("");
-
-  /*
-   * Khi mở form sửa,
-   * nạp dữ liệu của người liên hệ hiện tại.
-   *
-   * Khi mở form thêm,
-   * chọn khách hàng đầu tiên nếu có.
-   */
-  useEffect(() => {
+  const getInitialFormData = () => {
     if (contact) {
-      setFormData({
+      return {
         name: contact.name || "",
         position: contact.position || "",
         email: contact.email || "",
         phone: contact.phone || "",
-        role:
-          contact.role ||
-          "người ảnh hưởng",
+        role: contact.role || "người ảnh hưởng",
         customerId:
           contact.customerId != null
             ? String(contact.customerId)
             : customers?.[0]?.id
               ? String(customers[0].id)
               : "",
-        isPrimary:
-          Boolean(contact.isPrimary),
-      });
-    } else {
-      setFormData({
-        name: "",
-        position: "",
-        email: "",
-        phone: "",
-        role: "người ảnh hưởng",
-        customerId:
-          customers?.[0]?.id
-            ? String(customers[0].id)
-            : "",
-        isPrimary: false,
-      });
+        isPrimary: Boolean(contact.isPrimary),
+      };
     }
+    return {
+      name: "",
+      position: "",
+      email: "",
+      phone: "",
+      role: "người ảnh hưởng",
+      customerId: customers?.[0]?.id ? String(customers[0].id) : "",
+      isPrimary: false,
+    };
+  };
 
+  const [formData, setFormData] = useState(getInitialFormData);
+  const [prevContact, setPrevContact] = useState(contact);
+  const [error, setError] = useState("");
+
+  if (contact !== prevContact) {
+    setPrevContact(contact);
+    setFormData(getInitialFormData());
     setError("");
-  }, [contact, customers]);
+  }
 
   const handleChange = (event) => {
     const { name, value, type, checked } =

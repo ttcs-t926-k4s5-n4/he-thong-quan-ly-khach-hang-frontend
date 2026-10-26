@@ -141,7 +141,9 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(opportunities));
     } catch {
-      setNotice("Không thể lưu dữ liệu vào trình duyệt.");
+      queueMicrotask(() => {
+        setNotice("Không thể lưu dữ liệu vào trình duyệt.");
+      });
     }
   }, [opportunities]);
 
