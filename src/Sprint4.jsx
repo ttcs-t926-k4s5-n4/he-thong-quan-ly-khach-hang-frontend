@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { api, API_BASE } from './api'
 import {
   Users, Plus, Search, Flame, ThermometerSun, Snowflake, Clock3, Check, X, RefreshCw,
   FileSpreadsheet, Download, Upload, Megaphone, Code2, Copy, Merge, Target, Settings2,
   GitBranch, Save, Trash2, UserCheck, ArrowRightLeft, AlertTriangle, Filter, CalendarDays,
   BarChart3, Link2, ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  ChevronDown, ChevronUp, Zap
+  ChevronDown, ChevronUp, Zap, ExternalLink
 } from 'lucide-react'
 import './sprint4.css'
 
@@ -14,7 +14,13 @@ const money = v => Number(v || 0).toLocaleString('vi-VN') + ' ₫'
 const clsVi = { hot:'Nóng', warm:'Ấm', cold:'Lạnh' }
 const sourceVi = { web_form:'Biểu mẫu website', website:'Website', danh_thiep:'Danh thiếp', hoi_thao:'Hội thảo', su_kien:'Sự kiện', facebook:'Facebook', google_ads:'Google Ads', zalo:'Zalo', email:'Email', khac:'Khác' }
 const channelVi = { website:'Website', facebook:'Facebook', google_ads:'Google Ads', email:'Email', zalo:'Zalo', su_kien:'Sự kiện', hoi_thao:'Hội thảo', khac:'Khác' }
-const isErrorMessage = text => !!text && /không|lỗi|thiếu|bắt buộc|hãy|vui lòng|sai|không thể|không tồn tại|hết hạn|từ chối/i.test(String(text))
+const isErrorMessage = text => !!text && /không|lỗi|thiếu|bắt buộc|hãy|vui lòng|sai|không thể|không tồn tại|hết hạn|từ chối|thất bại|chưa|hợp lệ|invalid|error|unable|integer|failed|not found|warning/i.test(String(text))
+const formatFileSize = n => {
+  const v = Number(n || 0)
+  if (v <= 0) return '0 B'
+  if (v >= 1024 * 1024) return `${(v / (1024 * 1024)).toFixed(2)} MB`
+  return `${Math.max(1, Math.round(v / 1024))} KB`
+}
 
 export const QUICK_SOURCES = [
   { id: 'danh_thiep', label: 'Danh thiếp / Gọi', icon: '📇' },
@@ -34,7 +40,11 @@ export const QUICK_INTERESTS = [
 ]
 
 
-function Notice({text,type='ok'}){if(!text)return null;return <div className={`s4-notice ${type}`}>{type==='err'?<AlertTriangle size={17}/>:<Check size={17}/>}<span>{text}</span></div>}
+function Notice({text,type='ok'}){
+  if(!text)return null;
+  const isErr = type==='err' || isErrorMessage(text);
+  return <div className={`s4-notice ${isErr?'err':'ok'}`}>{isErr?<AlertTriangle size={17}/>:<Check size={17}/>}<span>{text}</span></div>
+}
 function Card({title,subtitle='',icon:Icon=Target,children,actions=null}){return <section className="s4-card"><header className="s4-card-head"><div className="s4-title-wrap"><span className="s4-icon"><Icon size={20}/></span><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div></div>{actions&&<div className="s4-head-actions">{actions}</div>}</header>{children}</section>}
 function Field({label,children}){return <label className="s4-field"><span>{label}</span>{children}</label>}
 function Btn({children,onClick,kind='primary',disabled=false,type='button'}){return <button type={type} disabled={disabled} onClick={onClick} className={`s4-btn ${kind}`}>{children}</button>}
@@ -46,7 +56,7 @@ async function upload(path,form){const r=await fetch(API_BASE+path,{method:'POST
 function Classification({value}){const Icon=value==='hot'?Flame:value==='warm'?ThermometerSun:Snowflake;return <Badge tone={value==='hot'?'red':value==='warm'?'amber':'blue'}><Icon size={13}/>{clsVi[value]||value}</Badge>}
 function SLA({value}){return value==='breached'?<Badge tone="red"><AlertTriangle size={13}/>Quá SLA</Badge>:value==='warning'?<Badge tone="amber"><Clock3 size={13}/>Sắp quá SLA</Badge>:value==='not_assigned'?<Badge tone="gray">Chưa phân</Badge>:<Badge tone="green"><Check size={13}/>Trong SLA</Badge>}
 
-function Pagination({ currentPage, totalItems, pageSize, onPageChange, onPageSizeChange, pageSizeOptions = [7, 15, 30, 50, 100] }) {
+function Pagination({ currentPage, totalItems, pageSize, onPageChange, onPageSizeChange, pageSizeOptions = [7, 10, 15, 20, 50], itemLabel = 'Lead' }) {
   const totalPages = Math.ceil(totalItems / pageSize) || 1
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1
   const endItem = Math.min(currentPage * pageSize, totalItems)
@@ -72,7 +82,7 @@ function Pagination({ currentPage, totalItems, pageSize, onPageChange, onPageSiz
   return (
     <div className="s4-pagination-bar">
       <div className="s4-pagination-info">
-        <span>Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trong tổng số <b>{totalItems}</b> Lead</span>
+        <span>Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trong tổng số <b>{totalItems}</b> {itemLabel || 'mục'}</span>
         {onPageSizeChange && (
           <div className="s4-page-size-selector">
             <span>Hiển thị:</span>
@@ -174,10 +184,12 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
   const [campaignExcel, setCampaignExcel] = useState('')
   const [preview, setPreview] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef(null)
 
   // Web forms list inside modal
   const [formsList, setFormsList] = useState([])
-  const [copiedCode, setCopiedCode] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -185,6 +197,10 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
       api('/api/s4/forms').then(d => setFormsList(d.items || [])).catch(() => {})
       setM('')
       setErr(false)
+    } else {
+      setFile(null)
+      setPreview(null)
+      setIsDragging(false)
     }
   }, [isOpen])
 
@@ -239,8 +255,61 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
   }
 
   function handleKeyDown(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (activeTab === 'single' && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       createLead()
+    }
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const droppedFile = e.dataTransfer?.files?.[0]
+    if (droppedFile) {
+      const ext = droppedFile.name.toLowerCase().split('.').pop()
+      if (['xlsx', 'xls', 'csv'].includes(ext)) {
+        setFile(droppedFile)
+        setPreview(null)
+        setM('')
+        setErr(false)
+      } else {
+        setM('Chỉ hỗ trợ tệp định dạng .xlsx, .xls hoặc .csv.')
+        setErr(true)
+      }
+    }
+  }
+
+  function handleFileInputChange(e) {
+    const selected = e.target.files?.[0]
+    if (selected) {
+      setFile(selected)
+      setPreview(null)
+      setM('')
+      setErr(false)
+    }
+  }
+
+  function clearSelectedFile(e) {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    setFile(null)
+    setPreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -255,7 +324,7 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
       fd.append('campaign_id', campaignExcel)
       const prevData = await upload('/api/s4/leads/import-preview', fd)
       setPreview(prevData)
-      setM(`Đã kiểm tra: ${prevData.valid} dòng hợp lệ, ${prevData.invalid} dòng lỗi.`)
+      setM(`Đã phân tích xong: ${prevData.valid} dòng hợp lệ, ${prevData.invalid} dòng lỗi / trùng.`)
       setErr(false)
     } catch (er) {
       setM(msg(er))
@@ -295,8 +364,11 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
               <Zap size={20} />
             </div>
             <div>
-              <h3>Tạo Lead nhanh (Quick Create)</h3>
-              <p>Chọn Option 1 chạm · Ngắn gọn · Không cần tạo trang mới</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3>Tạo Lead nhanh</h3>
+                <span className="s4-modal-header-badge">Quick Create ⚡</span>
+              </div>
+              <p>Chọn Option 1 chạm · Tiết kiệm thời gian · Không cần mở trang mới</p>
             </div>
           </div>
           <button type="button" className="s4-modal-close" onClick={onClose} title="Đóng (Esc)">
@@ -311,21 +383,21 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
               className={`s4-modal-tab-btn ${activeTab === 'single' ? 'active' : ''}`}
               onClick={() => setActiveTab('single')}
             >
-              <Zap size={15} /> 1. Tạo 1 Lead nhanh (5s)
+              <Zap size={14} /> 1. Tạo 1 Lead nhanh (5s)
             </button>
             <button
               type="button"
               className={`s4-modal-tab-btn ${activeTab === 'excel' ? 'active' : ''}`}
               onClick={() => setActiveTab('excel')}
             >
-              <FileSpreadsheet size={15} /> 2. Nhập file Excel nhanh
+              <FileSpreadsheet size={14} /> 2. Nhập file Excel nhanh {file ? '•' : ''}
             </button>
             <button
               type="button"
               className={`s4-modal-tab-btn ${activeTab === 'form' ? 'active' : ''}`}
               onClick={() => setActiveTab('form')}
             >
-              <Link2 size={15} /> 3. Biểu mẫu Website
+              <Link2 size={14} /> 3. Biểu mẫu Website
             </button>
           </div>
 
@@ -470,22 +542,26 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
           )}
 
           {activeTab === 'excel' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: '#475569' }}>
-                  Kéo thả file Excel hoặc chọn file (.xlsx, .xls, .csv):
-                </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Header card with template download */}
+              <div className="s4-excel-top-bar">
+                <div className="s4-excel-top-info">
+                  <span className="s4-excel-top-title">Nhập danh sách từ file bảng tính</span>
+                  <span className="s4-excel-top-sub">Hệ thống tự động phát hiện trùng lặp Email/SĐT và chuẩn hóa dữ liệu</span>
+                </div>
                 <a
                   href={`${API_BASE}/api/s4/leads/import-template`}
                   download="mau-nhap-lead.xlsx"
-                  className="s4-inline-btn"
-                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  className="s4-template-btn"
+                  title="Tải tệp mẫu Excel chuẩn để điền dữ liệu"
                 >
-                  <Download size={13} /> Tải tệp mẫu
+                  <Download size={14} />
+                  <span>Tải file Excel mẫu (.xlsx)</span>
                 </a>
               </div>
 
-              <div className="s4-grid cols-2" style={{ gap: '10px' }}>
+              {/* 2-column configuration: Nguồn mặc định & Chiến dịch */}
+              <div className="s4-grid cols-2" style={{ gap: '12px' }}>
                 <Field label="Nguồn mặc định *">
                   <select value={sourceExcel} onChange={e => setSourceExcel(e.target.value)}>
                     <option value="danh_thiep">Danh thiếp / Gọi</option>
@@ -493,86 +569,254 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
                     <option value="facebook">Facebook</option>
                     <option value="zalo">Zalo</option>
                     <option value="hoi_thao">Hội thảo / Sự kiện</option>
+                    <option value="google_ads">Google Ads</option>
+                    <option value="email">Email</option>
                     <option value="khac">Khác</option>
                   </select>
                 </Field>
                 <Field label="Chiến dịch">
                   <select value={campaignExcel} onChange={e => setCampaignExcel(e.target.value)}>
-                    <option value="">Không gắn</option>
+                    <option value="">-- Không gắn chiến dịch --</option>
                     {opts.campaigns?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </Field>
               </div>
 
-              <div className="s4-upload-box" style={{ padding: '12px' }}>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={e => { setFile(e.target.files?.[0] || null); setPreview(null); }}
-                  style={{ fontSize: '13px' }}
-                />
-              </div>
+              {/* Hidden native input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="s4-quick-excel-file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
 
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <Btn kind="soft" onClick={handleExcelPreview} disabled={!file || importing}>
-                  <Search size={14} /> {importing ? 'Đang kiểm tra...' : 'Xem trước'}
-                </Btn>
-                {preview && (
-                  <Btn onClick={handleExcelConfirm} disabled={importing || preview.valid === 0}>
-                    <Check size={14} /> Nhập {preview.valid} dòng hợp lệ
-                  </Btn>
-                )}
-              </div>
+              {/* Modern Drag & Drop Zone OR Selected File Card */}
+              {!file ? (
+                <div
+                  className={`s4-dropzone ${isDragging ? 'is-dragging' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="s4-dropzone-icon-box">
+                    <FileSpreadsheet size={32} />
+                    <div className="s4-dropzone-icon-badge">
+                      <Upload size={13} />
+                    </div>
+                  </div>
+                  <div className="s4-dropzone-copy">
+                    <div className="s4-dropzone-main">
+                      <b>Kéo thả file Excel vào đây</b> hoặc <span className="s4-dropzone-link">chọn từ thiết bị</span>
+                    </div>
+                    <div className="s4-dropzone-sub">
+                      Hỗ trợ tệp <b>.XLSX</b>, <b>.XLS</b> và <b>.CSV</b> (Dung lượng tối đa 15MB)
+                    </div>
+                  </div>
+                  <div className="s4-dropzone-pills">
+                    <span className="s4-fmt-pill green">.XLSX</span>
+                    <span className="s4-fmt-pill blue">.XLS</span>
+                    <span className="s4-fmt-pill purple">.CSV</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="s4-file-card">
+                  <div className="s4-file-card-icon">
+                    <FileSpreadsheet size={26} />
+                    <span className="s4-file-card-tag">
+                      {(file.name.split('.').pop() || 'XLSX').toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="s4-file-card-info">
+                    <div className="s4-file-card-name" title={file.name}>
+                      {file.name}
+                    </div>
+                    <div className="s4-file-card-meta">
+                      <span className="s4-file-card-size">{formatFileSize(file.size)}</span>
+                      <span className="s4-dot-sep">•</span>
+                      {preview ? (
+                        <span className="s4-file-card-status verified">
+                          <Check size={13} /> Đã kiểm tra ({preview.valid} hợp lệ)
+                        </span>
+                      ) : importing ? (
+                        <span className="s4-file-card-status checking">
+                          <RefreshCw size={13} className="s4-spin" /> Đang kiểm tra dữ liệu...
+                        </span>
+                      ) : (
+                        <span className="s4-file-card-status ready">
+                          <Clock3 size={13} /> Sẵn sàng xem trước dữ liệu
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="s4-file-card-actions">
+                    <button
+                      type="button"
+                      className="s4-file-action-btn change"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Chọn tệp khác"
+                    >
+                      <RefreshCw size={13} />
+                      <span>Đổi file</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="s4-file-action-btn remove"
+                      onClick={clearSelectedFile}
+                      title="Bỏ tệp đã chọn"
+                    >
+                      <X size={14} />
+                      <span>Bỏ chọn</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
+              {/* Preview Result Summary & Mini Table */}
               {preview && (
-                <div style={{ fontSize: '12.5px', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <b>Kết quả kiểm tra:</b> {preview.valid} hợp lệ · {preview.invalid} lỗi
+                <div className="s4-preview-section">
+                  <div className="s4-preview-stats">
+                    <div className="s4-preview-stat-card total">
+                      <div className="s4-stat-num">{preview.items?.length || (preview.valid + preview.invalid)}</div>
+                      <div className="s4-stat-lbl">Tổng số dòng</div>
+                    </div>
+                    <div className="s4-preview-stat-card valid">
+                      <div className="s4-stat-num">
+                        <Check size={18} /> {preview.valid}
+                      </div>
+                      <div className="s4-stat-lbl">Hợp lệ để nhập</div>
+                    </div>
+                    <div className={`s4-preview-stat-card ${preview.invalid > 0 ? 'invalid' : 'zero-err'}`}>
+                      <div className="s4-stat-num">
+                        {preview.invalid > 0 ? <AlertTriangle size={18} /> : <Check size={18} />} {preview.invalid}
+                      </div>
+                      <div className="s4-stat-lbl">{preview.invalid > 0 ? 'Dòng lỗi / Trùng' : 'Không có lỗi'}</div>
+                    </div>
+                  </div>
+
+                  {preview.items && preview.items.length > 0 && (
+                    <div className="s4-preview-table-box">
+                      <div className="s4-preview-table-header">
+                        <span className="s4-preview-table-title">
+                          Bản xem trước dữ liệu ({Math.min(5, preview.items.length)} / {preview.items.length} dòng đầu)
+                        </span>
+                        <span className="s4-preview-table-hint">
+                          {preview.invalid > 0 ? '⚠️ Dòng lỗi sẽ tự động được bỏ qua khi nhập' : '✨ Toàn bộ dữ liệu hợp lệ'}
+                        </span>
+                      </div>
+                      <div className="s4-preview-table-scroll">
+                        <table className="s4-preview-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: '42px', textAlign: 'center' }}>#</th>
+                              <th>Họ tên Lead</th>
+                              <th>Thông tin liên hệ</th>
+                              <th>Nguồn</th>
+                              <th>Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {preview.items.slice(0, 5).map((row, idx) => {
+                              const hasErr = row.errors && row.errors.length > 0
+                              return (
+                                <tr key={idx} className={hasErr ? 'is-error' : 'is-valid'}>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <span className="s4-row-badge">{row.row || (idx + 1)}</span>
+                                  </td>
+                                  <td>
+                                    <span className="s4-lead-name">{row.full_name || '—'}</span>
+                                  </td>
+                                  <td>
+                                    <span className="s4-lead-contact">{row.phone || row.email || '—'}</span>
+                                  </td>
+                                  <td>
+                                    <span className="s4-lead-source">{sourceVi[row.source] || row.source || 'Danh thiếp'}</span>
+                                  </td>
+                                  <td>
+                                    {hasErr ? (
+                                      <span className="s4-badge red" title={row.errors.join('; ')}>
+                                        <AlertTriangle size={12} /> {row.errors[0]}
+                                      </span>
+                                    ) : (
+                                      <span className="s4-badge green">
+                                        <Check size={12} /> Hợp lệ
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'form' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <span style={{ fontSize: '13px', color: '#475569' }}>
-                Các biểu mẫu nhúng website tự động thu thập Lead:
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="s4-excel-top-bar">
+                <div className="s4-excel-top-info">
+                  <span className="s4-excel-top-title">Biểu mẫu nhúng website tự động thu thập Lead</span>
+                  <span className="s4-excel-top-sub">Nhúng mã Javascript vào website, landing page hoặc blog để tự động đón khách hàng tiềm năng</span>
+                </div>
+              </div>
+
               {!formsList.length ? (
-                <Empty text="Chưa có biểu mẫu website nào. Hãy tạo tại mục Biểu mẫu nhúng." />
+                <Empty text="Chưa có biểu mẫu website nào. Hãy tạo tại mục Biểu mẫu nhúng trong CRM." />
               ) : (
                 formsList.map(formItem => (
-                  <div key={formItem.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', background: '#fafbfc' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <b>{formItem.name}</b>
+                  <div key={formItem.id} className="s4-webform-card">
+                    <div className="s4-webform-head">
+                      <div className="s4-webform-title">
+                        <b>{formItem.name}</b>
+                        <span className="s4-webform-meta">
+                          Nguồn: <b>{formItem.source_name}</b> • Đã thu thập: <b>{formItem.lead_count} Lead</b>
+                        </span>
+                      </div>
                       <a
                         href={`${API_BASE}/embed/${formItem.public_key}/page`}
                         target="_blank"
                         rel="noreferrer"
-                        className="s4-inline-btn"
-                        style={{ textDecoration: 'none' }}
+                        className="s4-webform-demo-btn"
                       >
-                        Mở form demo ↗
+                        <ExternalLink size={13} /> Mở form demo ↗
                       </a>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
-                      Nguồn: <b>{formItem.source_name}</b> · Đã thu thập: <b>{formItem.lead_count} Lead</b>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input
-                        readOnly
-                        value={`<script src="${API_BASE}/embed/${formItem.public_key}.js"></script>`}
-                        style={{ fontSize: '11px', background: '#fff' }}
-                      />
+                    <div className="s4-webform-code-row">
+                      <div className="s4-webform-code-wrap">
+                        <Code2 size={14} className="s4-code-icon" />
+                        <input
+                          readOnly
+                          value={`<script src="${API_BASE}/embed/${formItem.public_key}.js"></script>`}
+                          className="s4-webform-code-input"
+                        />
+                      </div>
                       <button
                         type="button"
-                        className="s4-inline-btn"
+                        className={`s4-copy-btn ${copiedCode === formItem.public_key ? 'copied' : ''}`}
                         onClick={() => {
                           navigator.clipboard?.writeText(`<script src="${API_BASE}/embed/${formItem.public_key}.js"></script>`)
-                          setCopiedCode(true)
-                          setTimeout(() => setCopiedCode(false), 2000)
+                          setCopiedCode(formItem.public_key)
+                          setTimeout(() => setCopiedCode(null), 2000)
                         }}
                       >
-                        {copiedCode ? 'Đã chép!' : 'Sao chép'}
+                        {copiedCode === formItem.public_key ? (
+                          <>
+                            <Check size={14} /> Đã chép!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Sao chép mã
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -584,15 +828,63 @@ export function QuickLeadModal({ isOpen, onClose, onSuccess }) {
 
         {activeTab === 'single' && (
           <div className="s4-modal-foot">
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-              Mẹo: Nhấn <b>Ctrl + Enter</b> để tạo ngay
-            </span>
+            <div className="s4-foot-hint">
+              <span className="s4-kbd">Ctrl</span> + <span className="s4-kbd">Enter</span>
+              <span style={{ marginLeft: '4px' }}>để tạo Lead ngay lập tức</span>
+            </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <Btn kind="soft" onClick={onClose}>Hủy bỏ</Btn>
               <Btn onClick={createLead} disabled={submitting}>
                 <Zap size={16} /> {submitting ? 'Đang tạo...' : '⚡ Tạo Lead ngay'}
               </Btn>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'excel' && (
+          <div className="s4-modal-foot">
+            <div className="s4-foot-hint">
+              <ShieldCheck size={15} style={{ color: '#4f46e5' }} />
+              <span>Hệ thống chỉ lưu bản ghi hợp lệ, tự động bỏ qua dòng trùng lặp.</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Btn kind="soft" onClick={onClose}>Đóng</Btn>
+              {!preview ? (
+                <Btn onClick={handleExcelPreview} disabled={!file || importing} kind="primary">
+                  {importing ? (
+                    <>
+                      <RefreshCw size={15} className="s4-spin" /> Đang kiểm tra...
+                    </>
+                  ) : (
+                    <>
+                      <Search size={15} /> Xem trước dữ liệu
+                    </>
+                  )}
+                </Btn>
+              ) : (
+                <Btn onClick={handleExcelConfirm} disabled={importing || preview.valid === 0} kind="primary">
+                  {importing ? (
+                    <>
+                      <RefreshCw size={15} className="s4-spin" /> Đang nhập Lead...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} /> Nhập ngay {preview.valid} Lead hợp lệ
+                    </>
+                  )}
+                </Btn>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'form' && (
+          <div className="s4-modal-foot">
+            <div className="s4-foot-hint">
+              <Link2 size={15} style={{ color: '#4f46e5' }} />
+              <span>Dán mã Javascript vào website để tự động bắt Lead vào CRM.</span>
+            </div>
+            <Btn kind="soft" onClick={onClose}>Đóng</Btn>
           </div>
         )}
       </div>
@@ -858,31 +1150,6 @@ export function LeadPage({user}){
   async function delSaved(id){try{await api('/api/s4/saved-filters/'+id,{method:'DELETE'});loadSaved()}catch(e){setM(msg(e));setErr(true)}}
 
   return <div className="s4-page">
-    <div className="s4-hero">
-      <div>
-        <h1>Danh sách Lead</h1>
-        <p>Một nơi để ưu tiên, nhận/từ chối, theo dõi SLA và chuyển đổi lead thành khách hàng.</p>
-      </div>
-      <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
-        {canCreateLead && (
-          <Btn onClick={()=>setShowAddModal(true)}>
-            <Zap size={16}/>+ Thêm Lead nhanh
-          </Btn>
-        )}
-        <Btn kind={showFilters ? 'primary' : 'soft'} onClick={()=>setShowFilters(v=>!v)}>
-          <Filter size={15}/>{showFilters ? 'Đóng bộ lọc' : '🔍 Bộ lọc Lead'}{hasActiveFilter && !showFilters ? ' (Đang lọc)' : ''}
-        </Btn>
-        {hasActiveFilter && (
-          <Btn kind="soft" onClick={()=>{const empty={q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false};setFilters(empty);setPage(1);load(empty,1,perPage)}}>
-            <X size={14}/>Xóa lọc
-          </Btn>
-        )}
-        <div className="s4-hero-stat">
-          <b>{data.total||0}</b><span>Lead theo bộ lọc</span>
-        </div>
-      </div>
-    </div>
-
     <Notice text={m} type={err?'err':'ok'}/>
 
     {/* Modal Tạo Lead Nhanh - Không tạo trang mới, Option 1 chạm */}
@@ -951,24 +1218,30 @@ export function LeadPage({user}){
       subtitle="Lead quá SLA được tô nổi bật; điểm chỉ dùng để sắp xếp ưu tiên, không tự động loại."
       icon={Users}
       actions={
-        <div style={{display:'flex',gap:'8px'}}>
+        <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
           {canCreateLead && (
             <Btn kind="primary" onClick={()=>setShowAddModal(true)}>
               <Zap size={14}/>+ Tạo Lead nhanh
             </Btn>
           )}
-          {!showFilters && (
-            <Btn kind="soft" onClick={()=>setShowFilters(true)}>
-              <Filter size={14}/>{hasActiveFilter ? 'Đang lọc' : 'Lọc Lead'}
+          <Btn kind={showFilters ? 'primary' : 'soft'} onClick={()=>setShowFilters(v=>!v)}>
+            <Filter size={14}/>{showFilters ? 'Đóng bộ lọc' : '🔍 Bộ lọc Lead'}{hasActiveFilter && !showFilters ? ' (Đang lọc)' : ''}
+          </Btn>
+          {hasActiveFilter && (
+            <Btn kind="soft" onClick={()=>{const empty={q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false};setFilters(empty);setPage(1);load(empty,1,perPage)}}>
+              <X size={14}/>Xóa lọc
             </Btn>
           )}
           <Btn kind="soft" onClick={()=>{setPage(1);load(filters,1,perPage)}}>
             <RefreshCw size={14}/>Tải lại
           </Btn>
+          <span className="s4-badge blue" style={{fontWeight:700,padding:'6px 12px',fontSize:'13px',borderRadius:'8px'}}>
+            {data.total||0} Lead
+          </span>
         </div>
       }
     >
-      {loadingLeads?<Empty text="Đang tải danh sách Lead..."/>:err?<Empty text="Không tải được danh sách Lead. Kiểm tra thông báo lỗi phía trên và kết nối Backend."/>:!data.items?.length?<div className="s4-empty"><p>Không có Lead phù hợp với bộ lọc hoặc quyền xem dữ liệu hiện tại.</p><Btn kind="soft" onClick={()=>{const empty={q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false};setFilters(empty);setPage(1);load(empty,1,perPage)}}><RefreshCw size={15}/>Xóa bộ lọc và tải lại</Btn></div>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Nguồn</th><th>Điểm</th><th>Trạng thái</th><th>Phụ trách</th><th>SLA</th><th>Thao tác</th></tr></thead><tbody>{data.items.map(x=><tr key={x.id} className={x.sla_status==='breached'?'s4-row-danger':''}><td><b>{x.full_name}</b><small>{x.company||'-'} · {x.phone||x.email||'-'}</small></td><td>{sourceVi[x.source]||x.source}</td><td><div className="s4-score"><b>{x.score}</b><Classification value={x.classification}/></div></td><td>{x.status}</td><td>{x.assigned_name||'Chưa phân'}</td><td><SLA value={x.sla_status}/></td><td>{canHandleLead(x)?<div className="s4-mini-actions">{x.status==='Đã phân công'&&<button type="button" title="Nhận Lead" onClick={()=>accept(x.id)}><UserCheck size={15}/></button>}<button type="button" title="Từ chối Lead" onClick={()=>setRejectLeadTarget(x)}><X size={15}/></button><button type="button" title="Chuyển thành khách hàng & cơ hội" onClick={()=>setConvertLeadTarget(x)}><ArrowRightLeft size={15}/></button></div>:<Badge tone={x.status==='Đã chuyển đổi'?'green':'gray'}>{x.status==='Đã chuyển đổi'?'Đã chuyển đổi':'Chỉ xem'}</Badge>}</td></tr>)}</tbody></table></div><Pagination currentPage={page} totalItems={data.total||0} pageSize={perPage} pageSizeOptions={[7, 15, 30, 50, 100]} onPageChange={p=>{setPage(p);load(filters,p,perPage)}} onPageSizeChange={ps=>{setPerPage(ps);setPage(1);load(filters,1,ps)}}/></>}
+      {loadingLeads?<Empty text="Đang tải danh sách Lead..."/>:err?<Empty text="Không tải được danh sách Lead. Kiểm tra thông báo lỗi phía trên và kết nối Backend."/>:!data.items?.length?<div className="s4-empty"><p>Không có Lead phù hợp với bộ lọc hoặc quyền xem dữ liệu hiện tại.</p><Btn kind="soft" onClick={()=>{const empty={q:'',status:'',source:'',classification:'',assigned_to:'',date_from:'',date_to:'',sla_breached_only:false};setFilters(empty);setPage(1);load(empty,1,perPage)}}><RefreshCw size={15}/>Xóa bộ lọc và tải lại</Btn></div>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Nguồn</th><th>Điểm</th><th>Trạng thái</th><th>Phụ trách</th><th>SLA</th><th>Thao tác</th></tr></thead><tbody>{data.items.map(x=><tr key={x.id} className={x.sla_status==='breached'?'s4-row-danger':''}><td><b>{x.full_name}</b><small>{x.company||'-'} · {x.phone||x.email||'-'}</small></td><td>{sourceVi[x.source]||x.source}</td><td><div className="s4-score"><b>{x.score}</b><Classification value={x.classification}/></div></td><td>{x.status}</td><td>{x.assigned_name||'Chưa phân'}</td><td><SLA value={x.sla_status}/></td><td>{canHandleLead(x)?<div className="s4-mini-actions">{x.status==='Đã phân công'&&<button type="button" title="Nhận Lead" onClick={()=>accept(x.id)}><UserCheck size={15}/></button>}<button type="button" title="Từ chối Lead" onClick={()=>setRejectLeadTarget(x)}><X size={15}/></button><button type="button" title="Chuyển thành khách hàng & cơ hội" onClick={()=>setConvertLeadTarget(x)}><ArrowRightLeft size={15}/></button></div>:<Badge tone={x.status==='Đã chuyển đổi'?'green':'gray'}>{x.status==='Đã chuyển đổi'?'Đã chuyển đổi':'Chỉ xem'}</Badge>}</td></tr>)}</tbody></table></div><Pagination currentPage={page} totalItems={data.total||0} pageSize={perPage} pageSizeOptions={[7, 10, 15, 20, 50]} onPageChange={p=>{setPage(p);load(filters,p,perPage)}} onPageSizeChange={ps=>{setPerPage(ps);setPage(1);load(filters,1,ps)}}/></>}
     </Card>
   </div>
 }
@@ -989,7 +1262,6 @@ export function LeadImportPage(){
   async function prev(){if(!file){setErr(true);setM('Hãy chọn tệp Excel/CSV.');return}try{const fd=new FormData();fd.append('file',file);fd.append('source_default',source);fd.append('campaign_id',campaign);setPreview(await upload('/api/s4/leads/import-preview',fd));setM('Đã xem trước dữ liệu. Chưa ghi vào CSDL.');setErr(false)}catch(e){setM(msg(e));setErr(true)}}
   async function confirm(mode='valid_only'){try{const d=await api('/api/s4/leads/import-confirm',{method:'POST',body:JSON.stringify({token:preview.token,mode})});setM(d.message);setErr(false);setPreview(null)}catch(e){setM(msg(e));setErr(true)}}
   return <div className="s4-page">
-    <div className="s4-hero"><div><h1>Nhập Lead từ Excel</h1><p>Tải mẫu, xem trước từng dòng, sửa lỗi trước khi xác nhận nhập.</p></div></div>
     <Notice text={m} type={err?'err':'ok'}/>
     <Card title="Tải lên dữ liệu" icon={FileSpreadsheet} actions={<Btn kind="soft" onClick={download}><Download size={15}/>Tải tệp mẫu</Btn>}>
       <div className="s4-grid cols-2 s4-import-meta">
@@ -1015,13 +1287,896 @@ export function LeadImportPage(){
   </div>
 }
 
-export function CampaignPage(){const[i,setI]=useState([]),[f,setF]=useState({name:'',channel:'website',budget:'',start_date:'',end_date:'',description:''}),[m,setM]=useState('');async function load(){try{setI((await api('/api/s4/campaigns')).items||[])}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);async function add(){try{setM((await api('/api/s4/campaigns',{method:'POST',body:JSON.stringify({...f,budget:Number(f.budget)||0})})).message);setF({name:'',channel:'website',budget:'',start_date:'',end_date:'',description:''});load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Chiến dịch Marketing</h1><p>Đo số Lead, cơ hội và giá trị đã chốt theo từng chiến dịch.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Khai báo chiến dịch" icon={Megaphone}><div className="s4-grid cols-3"><Field label="Tên chiến dịch"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field><Field label="Kênh"><select value={f.channel} onChange={e=>setF({...f,channel:e.target.value})}><option value="website">Website</option><option value="facebook">Facebook</option><option value="google_ads">Google Ads</option><option value="email">Email</option><option value="zalo">Zalo</option><option value="su_kien">Sự kiện</option><option value="hoi_thao">Hội thảo</option><option value="khac">Khác</option></select></Field><Field label="Ngân sách"><input type="number" value={f.budget} onChange={e=>setF({...f,budget:e.target.value})}/></Field><Field label="Ngày bắt đầu"><input type="date" value={f.start_date} onChange={e=>setF({...f,start_date:e.target.value})}/></Field><Field label="Ngày kết thúc"><input type="date" value={f.end_date} onChange={e=>setF({...f,end_date:e.target.value})}/></Field><Field label="Mô tả"><input value={f.description} onChange={e=>setF({...f,description:e.target.value})}/></Field></div><div className="s4-actions"><Btn onClick={add}><Plus size={16}/>Tạo chiến dịch</Btn></div></Card>{!i.length?<Empty text="Chưa có chiến dịch Marketing. Hãy tạo chiến dịch đầu tiên ở biểu mẫu phía trên."/>:<div className="s4-stat-grid">{i.map(x=><div className="s4-stat-card" key={x.id}><div className="s4-stat-top"><Megaphone size={18}/><Badge tone={x.status==='Đang chạy'?'green':x.status==='Đã kết thúc'?'gray':'blue'}>{x.status}</Badge></div><h3>{x.name}</h3><p>{channelVi[x.channel]||x.channel} · {x.start_date||'-'} → {x.end_date||'-'}</p><div className="s4-metrics"><span><b>{x.lead_count}</b> Lead</span><span><b>{x.opportunity_count}</b> Cơ hội</span><span><b>{money(x.closed_value)}</b> Đã chốt</span></div><small>Ngân sách: {money(x.budget)}</small></div>)}</div>}</div>}
+export function CampaignPage() {
+  const [items, setItems] = useState([])
+  const [form, setForm] = useState({ name: '', channel: 'website', budget: '', start_date: '', end_date: '', description: '' })
+  const [msgText, setMsgText] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const pageSize = 5
 
-export function LeadFormsPage(){const[i,setI]=useState([]),[c,setC]=useState([]),[f,setF]=useState({name:'',source_name:'Website',campaign_id:'',allowed_domains:''}),[m,setM]=useState(''),[code,setCode]=useState(null),[page,setPage]=useState(1);async function load(){try{setI((await api('/api/s4/forms')).items||[]);setC((await api('/api/s4/campaigns')).items||[])}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);async function add(){try{const d=await api('/api/s4/forms',{method:'POST',body:JSON.stringify({name:f.name,source_name:f.source_name,campaign_id:f.campaign_id?Number(f.campaign_id):null,allowed_domains:f.allowed_domains.split(',').map(x=>x.trim()).filter(Boolean),is_active:true})});setCode(d);setM(d.message);load()}catch(e){setM(msg(e))}}function copy(t){navigator.clipboard?.writeText(t);setM('Đã sao chép mã nhúng.')}async function toggle(id){try{setM((await api(`/api/s4/forms/${id}/toggle`,{method:'POST'})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Biểu mẫu nhúng Website</h1><p>Tạo form có chống spam, giới hạn IP và gắn đúng nguồn/chiến dịch.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Tạo biểu mẫu" icon={Code2}><div className="s4-grid cols-3"><Field label="Tên biểu mẫu"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field><Field label="Nguồn"><input value={f.source_name} onChange={e=>setF({...f,source_name:e.target.value})}/></Field><Field label="Chiến dịch"><select value={f.campaign_id} onChange={e=>setF({...f,campaign_id:e.target.value})}><option value="">Không gắn</option>{c.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></Field><Field label="Tên miền cho phép (cách nhau dấu phẩy)"><input placeholder="example.com, landing.example.com" value={f.allowed_domains} onChange={e=>setF({...f,allowed_domains:e.target.value})}/></Field></div><div className="s4-actions"><Btn onClick={add}><Plus size={16}/>Sinh mã nhúng</Btn></div>{code&&<div className="s4-code-grid"><div><b>Script</b><code>{code.script}</code><Btn kind="soft" onClick={()=>copy(code.script)}><Copy size={14}/>Sao chép</Btn></div><div><b>Iframe</b><code>{code.iframe}</code><Btn kind="soft" onClick={()=>copy(code.iframe)}><Copy size={14}/>Sao chép</Btn></div></div>}</Card><Card title="Biểu mẫu đã tạo" icon={Link2}>{!i.length?<Empty/>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Tên</th><th>Nguồn</th><th>Chiến dịch</th><th>Lead</th><th>Trạng thái</th><th>Trang demo</th><th>Thao tác</th></tr></thead><tbody>{i.slice((page-1)*7,page*7).map(x=><tr key={x.id}><td><b>{x.name}</b><small>{x.public_key}</small></td><td>{x.source_name}</td><td>{x.campaign_name||'-'}</td><td>{x.lead_count}</td><td><Badge tone={x.is_active?'green':'gray'}>{x.is_active?'Đang bật':'Đã tắt'}</Badge></td><td><a className="s4-link" target="_blank" rel="noreferrer" href={`${API_BASE}/embed/${x.public_key}/page`}>Mở form</a></td><td><button className="s4-inline-btn" onClick={()=>toggle(x.id)}>{x.is_active?'Tắt':'Bật'}</button></td></tr>)}</tbody></table></div>{i.length>7&&<Pagination currentPage={page} totalItems={i.length} pageSize={7} onPageChange={setPage}/>}</>}</Card></div>}
+  async function load() {
+    try {
+      const res = await api('/api/s4/campaigns')
+      setItems(res.items || [])
+    } catch (e) {
+      setMsgText(msg(e))
+    }
+  }
 
-export function LeadDuplicatesPage(){const[d,setD]=useState({pairs:[],customer_suggestions:[]}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/leads/duplicates'))}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);async function merge(a,b){if(!confirm(`Gộp lead #${b} vào #${a}?`))return;try{setM((await api('/api/s4/leads/merge',{method:'POST',body:JSON.stringify({keep_id:a,merge_id:b})})).message);load()}catch(e){setM(msg(e))}}async function linkCustomer(lid,cid){try{setM((await api(`/api/s4/leads/${lid}/link-customer/${cid}`,{method:'POST'})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Phát hiện & gộp Lead trùng</h1><p>Đối chiếu email, số điện thoại, tên công ty và gợi ý khách hàng đã tồn tại.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Cặp Lead nghi trùng" icon={Merge}>{!d.pairs?.length?<Empty text="Chưa phát hiện cặp Lead trùng."/>:<div className="s4-duplicate-grid">{d.pairs.map((p,n)=><div className="s4-compare" key={n}><div><Badge tone="blue">Bản giữ lại A</Badge><h3>{p.a.full_name}</h3><p>{p.a.email||'-'} · {p.a.phone||'-'}</p><small>{p.a.company||'-'}</small></div><div className="s4-merge-arrow"><Merge size={22}/><span>{p.reasons.join(', ')}</span></div><div><Badge tone="amber">Bản gộp B</Badge><h3>{p.b.full_name}</h3><p>{p.b.email||'-'} · {p.b.phone||'-'}</p><small>{p.b.company||'-'}</small></div><Btn onClick={()=>merge(p.a.id,p.b.id)}><Merge size={15}/>Gộp</Btn></div>)}</div>}</Card><Card title="Lead trùng với khách hàng đã có" icon={ShieldCheck}>{!d.customer_suggestions?.length?<Empty text="Chưa có gợi ý liên kết khách hàng."/>:<div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Khách hàng hiện có</th><th>Thao tác</th></tr></thead><tbody>{d.customer_suggestions.map((x,n)=><tr key={n}><td>{x.lead.full_name} · {x.lead.company}</td><td>#{x.customer.id} {x.customer.name}</td><td><button className="s4-inline-btn" onClick={()=>linkCustomer(x.lead.id,x.customer.id)}>Gắn khách hàng</button></td></tr>)}</tbody></table></div>}</Card></div>}
+  useEffect(() => { load() }, [])
 
-export function LeadScoringPage(){const[d,setD]=useState({rules:[],hot_min:70,warm_min:40}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/scoring'))}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);function addRule(){setD(x=>({...x,rules:[...x.rules,{criterion:'industry',match_value:'',points:10,sort_order:x.rules.length+1}]}))}function upd(n,k,v){setD(x=>({...x,rules:x.rules.map((r,i)=>i===n?{...r,[k]:v}:r)}))}async function save(){try{setM((await api('/api/s4/scoring',{method:'PUT',body:JSON.stringify({hot_min:Number(d.hot_min),warm_min:Number(d.warm_min),rules:d.rules.map(r=>({...r,points:Number(r.points),sort_order:Number(r.sort_order)}))})})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><div className="s4-hero"><div><h1>Chấm điểm Lead</h1><p>Cấu hình tiêu chí và ngưỡng Nóng / Ấm / Lạnh; điểm chỉ quyết định thứ tự ưu tiên.</p></div></div><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Ngưỡng phân loại" icon={Target}><div className="s4-grid cols-3"><Field label="Nóng từ"><input type="number" value={d.hot_min} onChange={e=>setD({...d,hot_min:e.target.value})}/></Field><Field label="Ấm từ"><input type="number" value={d.warm_min} onChange={e=>setD({...d,warm_min:e.target.value})}/></Field></div></Card><Card title="Tiêu chí tính điểm" icon={Settings2} actions={<Btn kind="soft" onClick={addRule}><Plus size={15}/>Thêm tiêu chí</Btn>}><div className="s4-rule-list">{d.rules.map((r,n)=><div className="s4-rule" key={n}><select value={r.criterion} onChange={e=>upd(n,'criterion',e.target.value)}><option value="industry">Ngành nghề</option><option value="company_size">Quy mô</option><option value="source">Nguồn</option><option value="interest_level">Mức quan tâm</option></select><input placeholder="Giá trị khớp" value={r.match_value} onChange={e=>upd(n,'match_value',e.target.value)}/><input type="number" value={r.points} onChange={e=>upd(n,'points',e.target.value)}/><button type="button" onClick={()=>setD(x=>({...x,rules:x.rules.filter((_,i)=>i!==n)}))}><Trash2 size={16}/></button></div>)}</div><div className="s4-actions"><Btn onClick={save}><Save size={16}/>Lưu & tính lại toàn bộ Lead</Btn></div></Card></div>}
+  async function handleAdd(e) {
+    if (e) e.preventDefault()
+    if (!form.name.trim()) {
+      setMsgText('Tên chiến dịch là bắt buộc.')
+      return
+    }
+    try {
+      const res = await api('/api/s4/campaigns', {
+        method: 'POST',
+        body: JSON.stringify({ ...form, budget: Number(form.budget) || 0 })
+      })
+      setMsgText(res.message || 'Tạo chiến dịch thành công.')
+      setForm({ name: '', channel: 'website', budget: '', start_date: '', end_date: '', description: '' })
+      setShowModal(false)
+      load()
+    } catch (e) {
+      setMsgText(msg(e))
+    }
+  }
+
+  const filtered = useMemo(() => {
+    return items.filter(c => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim()
+        const matchName = (c.name || '').toLowerCase().includes(q)
+        const matchChannel = (channelVi[c.channel] || c.channel || '').toLowerCase().includes(q)
+        const matchDesc = (c.description || '').toLowerCase().includes(q)
+        if (!matchName && !matchChannel && !matchDesc) return false
+      }
+      return true
+    })
+  }, [items, statusFilter, searchTerm])
+
+  const totalPages = Math.ceil(filtered.length / pageSize) || 1
+  const currentPage = Math.min(page, totalPages)
+  const pagedItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const totalLeads = items.reduce((acc, cur) => acc + (Number(cur.lead_count) || 0), 0)
+  const totalOpps = items.reduce((acc, cur) => acc + (Number(cur.opportunity_count) || 0), 0)
+  const totalWon = items.reduce((acc, cur) => acc + (Number(cur.closed_value) || 0), 0)
+
+  const countRunning = items.filter(x => x.status === 'Đang chạy').length
+  const countUpcoming = items.filter(x => x.status === 'Sắp chạy').length
+  const countEnded = items.filter(x => x.status === 'Đã kết thúc').length
+
+  return (
+    <div className="s4-page">
+      <Notice text={msgText} type={isErrorMessage(msgText) ? 'err' : 'ok'} />
+
+      {/* Hero Card: Danh sách chiến dịch hiển thị ngay đầu trang */}
+      <Card
+        title="Danh sách chiến dịch Marketing"
+        subtitle="Giám sát tiến độ tiếp thị, số lượng Lead thu thập và doanh thu bán hàng theo từng chiến dịch"
+        icon={Megaphone}
+        actions={
+          <Btn onClick={() => setShowModal(true)}>
+            <Plus size={16} /> Khai báo chiến dịch mới
+          </Btn>
+        }
+      >
+        {/* Chỉ số tổng quan */}
+        <div className="s4-stat-grid" style={{ marginBottom: 18 }}>
+          <div className="s4-stat-card" style={{ padding: '14px 18px' }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>Tổng số chiến dịch</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <b style={{ fontSize: 24, color: '#4f46e5' }}>{items.length}</b>
+              <Badge tone="green">{countRunning} đang chạy</Badge>
+            </div>
+          </div>
+          <div className="s4-stat-card" style={{ padding: '14px 18px' }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>Tổng Lead thu về</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <b style={{ fontSize: 24, color: '#0f172a' }}>{totalLeads}</b>
+              <span style={{ fontSize: 12, color: '#64748b' }}>khách hàng tiềm năng</span>
+            </div>
+          </div>
+          <div className="s4-stat-card" style={{ padding: '14px 18px' }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>Doanh thu đã chốt</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <b style={{ fontSize: 22, color: '#059669' }}>{money(totalWon)}</b>
+              <span style={{ fontSize: 12, color: '#64748b' }}>({totalOpps} cơ hội)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Thanh công cụ: Tìm kiếm & Lọc trạng thái */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 260, maxWidth: 450, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '7px 12px' }}>
+            <Search size={16} color="#64748b" />
+            <input
+              type="text"
+              placeholder="Tìm theo tên chiến dịch, kênh tiếp thị, mô tả..."
+              value={searchTerm}
+              onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
+              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: 13, color: '#1e293b' }}
+            />
+            {searchTerm && (
+              <button type="button" onClick={() => { setSearchTerm(''); setPage(1) }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={14}/>
+              </button>
+            )}
+          </div>
+
+          <div className="s4-page-size-pills">
+            <button
+              type="button"
+              className={`s4-size-pill ${statusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => { setStatusFilter('all'); setPage(1) }}
+            >
+              Tất cả ({items.length})
+            </button>
+            <button
+              type="button"
+              className={`s4-size-pill ${statusFilter === 'Đang chạy' ? 'active' : ''}`}
+              onClick={() => { setStatusFilter('Đang chạy'); setPage(1) }}
+            >
+              Đang chạy ({countRunning})
+            </button>
+            <button
+              type="button"
+              className={`s4-size-pill ${statusFilter === 'Sắp chạy' ? 'active' : ''}`}
+              onClick={() => { setStatusFilter('Sắp chạy'); setPage(1) }}
+            >
+              Sắp chạy ({countUpcoming})
+            </button>
+            <button
+              type="button"
+              className={`s4-size-pill ${statusFilter === 'Đã kết thúc' ? 'active' : ''}`}
+              onClick={() => { setStatusFilter('Đã kết thúc'); setPage(1) }}
+            >
+              Đã kết thúc ({countEnded})
+            </button>
+          </div>
+        </div>
+
+        {/* Danh sách thẻ chiến dịch */}
+        {!filtered.length ? (
+          <Empty text={items.length ? "Không tìm thấy chiến dịch phù hợp với bộ lọc." : "Chưa có chiến dịch Marketing nào. Nhấn '+ Khai báo chiến dịch mới' ở góc trên để tạo chiến dịch đầu tiên."} />
+        ) : (
+          <>
+            <div className="s4-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+              {pagedItems.map(x => (
+                <div className="s4-stat-card" key={x.id}>
+                  <div className="s4-stat-top">
+                    <Megaphone size={18} />
+                    <Badge tone={x.status === 'Đang chạy' ? 'green' : x.status === 'Đã kết thúc' ? 'gray' : 'blue'}>
+                      {x.status}
+                    </Badge>
+                  </div>
+                  <h3>{x.name}</h3>
+                  <p>{channelVi[x.channel] || x.channel} · {x.start_date || '-'} → {x.end_date || '-'}</p>
+                  {x.description && <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 10px', fontStyle: 'italic' }}>{x.description}</p>}
+                  <div className="s4-metrics">
+                    <span><b>{x.lead_count}</b> Lead</span>
+                    <span><b>{x.opportunity_count}</b> Cơ hội</span>
+                    <span><b>{money(x.closed_value)}</b> Đã chốt</span>
+                  </div>
+                  <small>Ngân sách: <b>{money(x.budget)}</b></small>
+                </div>
+              ))}
+            </div>
+
+            {/* Phân trang tối đa 5 chiến dịch mỗi trang */}
+            {filtered.length > pageSize && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={filtered.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                itemLabel="chiến dịch"
+              />
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Modal Khai báo chiến dịch mới */}
+      {showModal && (
+        <div className="s4-modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="s4-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="s4-modal-head">
+              <div className="s4-modal-title-wrap">
+                <div className="s4-modal-icon">
+                  <Megaphone size={20} />
+                </div>
+                <div>
+                  <h3>Khai báo chiến dịch Marketing</h3>
+                  <p>Thiết lập chiến dịch tiếp thị để gắn nguồn Lead và theo dõi chuyển đổi</p>
+                </div>
+              </div>
+              <button type="button" className="s4-modal-close" onClick={() => setShowModal(false)} title="Đóng">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdd}>
+              <div className="s4-modal-body">
+                <Field label="Tên chiến dịch (*)">
+                  <input
+                    required
+                    placeholder="Ví dụ: Webinar chuyển đổi số Q4, Quảng cáo Facebook tháng 11..."
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                  />
+                </Field>
+
+                <div className="s4-grid cols-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <Field label="Kênh tiếp thị">
+                    <select value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })}>
+                      <option value="website">Website</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="google_ads">Google Ads</option>
+                      <option value="email">Email</option>
+                      <option value="zalo">Zalo</option>
+                      <option value="su_kien">Sự kiện</option>
+                      <option value="hoi_thao">Hội thảo</option>
+                      <option value="khac">Khác</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Ngân sách dự kiến (VNĐ)">
+                    <input
+                      type="number"
+                      placeholder="Ví dụ: 20000000"
+                      value={form.budget}
+                      onChange={e => setForm({ ...form, budget: e.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                <div className="s4-grid cols-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <Field label="Ngày bắt đầu">
+                    <input
+                      type="date"
+                      value={form.start_date}
+                      onChange={e => setForm({ ...form, start_date: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Ngày kết thúc">
+                    <input
+                      type="date"
+                      value={form.end_date}
+                      onChange={e => setForm({ ...form, end_date: e.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Mô tả chiến dịch">
+                  <input
+                    placeholder="Ghi chú mục tiêu, đối tượng hướng tới..."
+                    value={form.description}
+                    onChange={e => setForm({ ...form, description: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="s4-modal-foot">
+                <Btn kind="soft" onClick={() => setShowModal(false)}>Hủy</Btn>
+                <Btn type="submit" kind="primary"><Plus size={16} />Tạo chiến dịch</Btn>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function LeadFormsPage() {
+  const [items, setItems] = useState([])
+  const [campaigns, setCampaigns] = useState([])
+  const [form, setForm] = useState({ name: '', source_name: 'Website', campaign_id: '', allowed_domains: '' })
+  const [msgText, setMsgText] = useState('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [viewCodeForm, setViewCodeForm] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const pageSize = 5
+
+  async function load() {
+    try {
+      const res = await api('/api/s4/forms')
+      setItems(res.items || [])
+      const cRes = await api('/api/s4/campaigns')
+      setCampaigns(cRes.items || [])
+    } catch (e) {
+      setMsgText(msg(e))
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function handleAdd(e) {
+    if (e) e.preventDefault()
+    if (!form.name.trim()) {
+      setMsgText('Tên biểu mẫu là bắt buộc.')
+      return
+    }
+    try {
+      const d = await api('/api/s4/forms', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: form.name.trim(),
+          source_name: form.source_name.trim() || 'Website',
+          campaign_id: form.campaign_id ? Number(form.campaign_id) : null,
+          allowed_domains: form.allowed_domains.split(',').map(x => x.trim()).filter(Boolean),
+          is_active: true
+        })
+      })
+      setMsgText(d.message || 'Tạo biểu mẫu thành công.')
+      const createdName = form.name.trim()
+      setForm({ name: '', source_name: 'Website', campaign_id: '', allowed_domains: '' })
+      setShowCreateModal(false)
+      // Mở ngay modal mã nhúng để tiện sao chép
+      setViewCodeForm({
+        name: createdName,
+        public_key: d.public_key,
+        script: d.script,
+        iframe: d.iframe
+      })
+      load()
+    } catch (e) {
+      setMsgText(msg(e))
+    }
+  }
+
+  function copyText(t) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(t)
+      setMsgText('Đã sao chép mã nhúng vào bộ nhớ tạm!')
+    }
+  }
+
+  async function toggle(id) {
+    try {
+      const res = await api(`/api/s4/forms/${id}/toggle`, { method: 'POST' })
+      setMsgText(res.message || 'Đã thay đổi trạng thái biểu mẫu.')
+      load()
+    } catch (e) {
+      setMsgText(msg(e))
+    }
+  }
+
+  const filtered = useMemo(() => {
+    return items.filter(f => {
+      if (activeFilter === 'active' && !f.is_active) return false
+      if (activeFilter === 'inactive' && f.is_active) return false
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim()
+        const matchName = (f.name || '').toLowerCase().includes(q)
+        const matchSource = (f.source_name || '').toLowerCase().includes(q)
+        const matchCamp = (f.campaign_name || '').toLowerCase().includes(q)
+        const matchKey = (f.public_key || '').toLowerCase().includes(q)
+        if (!matchName && !matchSource && !matchCamp && !matchKey) return false
+      }
+      return true
+    })
+  }, [items, activeFilter, searchTerm])
+
+  const totalPages = Math.ceil(filtered.length / pageSize) || 1
+  const currentPage = Math.min(page, totalPages)
+  const pagedItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const countActive = items.filter(x => x.is_active).length
+  const countInactive = items.filter(x => !x.is_active).length
+
+  const getCodeData = (f) => {
+    if (!f) return null
+    const base = API_BASE || window.location.origin
+    return {
+      name: f.name,
+      public_key: f.public_key,
+      script: f.script || `<script src="${base}/embed/${f.public_key}.js"></script>`,
+      iframe: f.iframe || `<iframe src="${base}/embed/${f.public_key}/page" width="100%" height="620" frameborder="0"></iframe>`,
+      demoUrl: `${base}/embed/${f.public_key}/page`
+    }
+  }
+
+  const activeCodeData = viewCodeForm ? getCodeData(viewCodeForm) : null
+
+  return (
+    <div className="s4-page">
+      <Notice text={msgText} type={isErrorMessage(msgText) ? 'err' : 'ok'} />
+
+      {/* Hero Card: Bảng danh sách biểu mẫu nhúng ở vị trí trung tâm */}
+      <Card
+        title="Danh sách biểu mẫu nhúng Website"
+        subtitle="Quản lý biểu mẫu thu thập Lead tự động tích hợp lên Landing Page hoặc Website doanh nghiệp"
+        icon={Code2}
+        actions={
+          <Btn onClick={() => setShowCreateModal(true)}>
+            <Plus size={16} /> Tạo biểu mẫu mới
+          </Btn>
+        }
+      >
+        {/* Thanh công cụ: Tìm kiếm & Lọc trạng thái */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 260, maxWidth: 450, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '7px 12px' }}>
+            <Search size={16} color="#64748b" />
+            <input
+              type="text"
+              placeholder="Tìm theo tên biểu mẫu, nguồn, chiến dịch..."
+              value={searchTerm}
+              onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
+              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: 13, color: '#1e293b' }}
+            />
+            {searchTerm && (
+              <button type="button" onClick={() => { setSearchTerm(''); setPage(1) }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={14}/>
+              </button>
+            )}
+          </div>
+
+          <div className="s4-page-size-pills">
+            <button
+              type="button"
+              className={`s4-size-pill ${activeFilter === 'all' ? 'active' : ''}`}
+              onClick={() => { setActiveFilter('all'); setPage(1) }}
+            >
+              Tất cả ({items.length})
+            </button>
+            <button
+              type="button"
+              className={`s4-size-pill ${activeFilter === 'active' ? 'active' : ''}`}
+              onClick={() => { setActiveFilter('active'); setPage(1) }}
+            >
+              Đang bật ({countActive})
+            </button>
+            <button
+              type="button"
+              className={`s4-size-pill ${activeFilter === 'inactive' ? 'active' : ''}`}
+              onClick={() => { setActiveFilter('inactive'); setPage(1) }}
+            >
+              Đã tắt ({countInactive})
+            </button>
+          </div>
+        </div>
+
+        {/* Bảng dữ liệu biểu mẫu */}
+        {!filtered.length ? (
+          <Empty text={items.length ? "Không tìm thấy biểu mẫu phù hợp với điều kiện tìm kiếm." : "Chưa có biểu mẫu nhúng nào. Bấm '+ Tạo biểu mẫu mới' ở phía trên để tạo."} />
+        ) : (
+          <>
+            <div className="s4-table-wrap">
+              <table className="s4-table">
+                <thead>
+                  <tr>
+                    <th>Tên biểu mẫu</th>
+                    <th>Nguồn Lead</th>
+                    <th>Chiến dịch</th>
+                    <th>Số Lead</th>
+                    <th>Trạng thái</th>
+                    <th>Mã nhúng</th>
+                    <th>Trang demo</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedItems.map(x => (
+                    <tr key={x.id}>
+                      <td>
+                        <b style={{ color: '#0f172a' }}>{x.name}</b>
+                        <small style={{ color: '#64748b', fontSize: 11 }}>Mã: {x.public_key}</small>
+                      </td>
+                      <td>
+                        <Badge tone="blue">{x.source_name || 'Website'}</Badge>
+                      </td>
+                      <td>
+                        {x.campaign_name ? (
+                          <span style={{ fontWeight: 600, color: '#4338ca' }}>{x.campaign_name}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}>Không gắn</span>
+                        )}
+                      </td>
+                      <td>
+                        <b style={{ fontSize: 14, color: '#0f172a' }}>{x.lead_count}</b>
+                      </td>
+                      <td>
+                        <Badge tone={x.is_active ? 'green' : 'gray'}>
+                          {x.is_active ? 'Đang bật' : 'Đã tắt'}
+                        </Badge>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="s4-btn soft"
+                          style={{ padding: '6px 10px', fontSize: 12, borderRadius: 8 }}
+                          onClick={() => setViewCodeForm(x)}
+                        >
+                          <Code2 size={13} /> Lấy mã nhúng
+                        </button>
+                      </td>
+                      <td>
+                        <a
+                          className="s4-link"
+                          target="_blank"
+                          rel="noreferrer"
+                          href={`${API_BASE}/embed/${x.public_key}/page`}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                          Mở form <ExternalLink size={12} />
+                        </a>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="s4-inline-btn"
+                          onClick={() => toggle(x.id)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: x.is_active ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                            background: x.is_active ? '#fef2f2' : '#f0fdf4',
+                            color: x.is_active ? '#dc2626' : '#16a34a'
+                          }}
+                        >
+                          {x.is_active ? 'Tắt' : 'Bật'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Phân trang tối đa 5 biểu mẫu mỗi trang */}
+            {filtered.length > pageSize && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={filtered.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                itemLabel="biểu mẫu"
+              />
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Modal 1: Tạo biểu mẫu mới */}
+      {showCreateModal && (
+        <div className="s4-modal-backdrop" onClick={() => setShowCreateModal(false)}>
+          <div className="s4-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="s4-modal-head">
+              <div className="s4-modal-title-wrap">
+                <div className="s4-modal-icon">
+                  <Code2 size={20} />
+                </div>
+                <div>
+                  <h3>Tạo biểu mẫu nhúng Website mới</h3>
+                  <p>Thu thập thông tin khách hàng từ Landing Page, Website tự động đồng bộ vào Lead</p>
+                </div>
+              </div>
+              <button type="button" className="s4-modal-close" onClick={() => setShowCreateModal(false)} title="Đóng">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdd}>
+              <div className="s4-modal-body">
+                <Field label="Tên biểu mẫu (*)">
+                  <input
+                    required
+                    placeholder="Ví dụ: Form đăng ký Webinar, Form liên hệ tư vấn..."
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                  />
+                </Field>
+
+                <div className="s4-grid cols-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <Field label="Nguồn Lead hiển thị">
+                    <input
+                      placeholder="Ví dụ: Landing Webinar, Website chính..."
+                      value={form.source_name}
+                      onChange={e => setForm({ ...form, source_name: e.target.value })}
+                    />
+                  </Field>
+
+                  <Field label="Chiến dịch gắn kèm">
+                    <select value={form.campaign_id} onChange={e => setForm({ ...form, campaign_id: e.target.value })}>
+                      <option value="">Không gắn chiến dịch</option>
+                      {campaigns.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <Field label="Tên miền cho phép (cách nhau dấu phẩy)">
+                  <input
+                    placeholder="example.com, landing.example.com"
+                    value={form.allowed_domains}
+                    onChange={e => setForm({ ...form, allowed_domains: e.target.value })}
+                  />
+                </Field>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <ShieldCheck size={18} color="#4f46e5" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.5 }}>
+                    Để chống spam, chỉ các website có tên miền trong danh sách cho phép mới có quyền gửi dữ liệu. Nếu để trống, form sẽ nhận dữ liệu từ mọi nguồn web.
+                  </span>
+                </div>
+              </div>
+
+              <div className="s4-modal-foot">
+                <Btn kind="soft" onClick={() => setShowCreateModal(false)}>Hủy</Btn>
+                <Btn type="submit" kind="primary"><Plus size={16} />Sinh mã nhúng</Btn>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Xem & Sao chép mã nhúng */}
+      {viewCodeForm && activeCodeData && (
+        <div className="s4-modal-backdrop" onClick={() => setViewCodeForm(null)}>
+          <div className="s4-modal-card" style={{ maxWidth: 720 }} onClick={e => e.stopPropagation()}>
+            <div className="s4-modal-head">
+              <div className="s4-modal-title-wrap">
+                <div className="s4-modal-icon">
+                  <Code2 size={20} />
+                </div>
+                <div>
+                  <h3>Mã nhúng: {activeCodeData.name}</h3>
+                  <p>Sao chép mã nhúng bên dưới và dán vào mã nguồn website của bạn</p>
+                </div>
+              </div>
+              <button type="button" className="s4-modal-close" onClick={() => setViewCodeForm(null)} title="Đóng">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="s4-modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Script option */}
+                <div style={{ background: '#f8faff', border: '1px solid #e1e7f5', borderRadius: 14, padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <b style={{ color: '#334155', fontSize: 13 }}>Cách 1: Nhúng mã Script (Khuyên dùng)</b>
+                    <button
+                      type="button"
+                      className="s4-btn soft"
+                      style={{ padding: '5px 10px', fontSize: 12 }}
+                      onClick={() => copyText(activeCodeData.script)}
+                    >
+                      <Copy size={13} /> Sao chép Script
+                    </button>
+                  </div>
+                  <code style={{ display: 'block', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10, fontSize: 12, color: '#4338ca', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                    {activeCodeData.script}
+                  </code>
+                </div>
+
+                {/* Iframe option */}
+                <div style={{ background: '#f8faff', border: '1px solid #e1e7f5', borderRadius: 14, padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <b style={{ color: '#334155', fontSize: 13 }}>Cách 2: Nhúng khung Iframe</b>
+                    <button
+                      type="button"
+                      className="s4-btn soft"
+                      style={{ padding: '5px 10px', fontSize: 12 }}
+                      onClick={() => copyText(activeCodeData.iframe)}
+                    >
+                      <Copy size={13} /> Sao chép Iframe
+                    </button>
+                  </div>
+                  <code style={{ display: 'block', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10, fontSize: 12, color: '#4338ca', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                    {activeCodeData.iframe}
+                  </code>
+                </div>
+
+                {/* Live demo preview link */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#eff6ff', borderRadius: 10, border: '1px solid #bfdbfe' }}>
+                  <span style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>Xem trực tiếp trang biểu mẫu độc lập:</span>
+                  <a
+                    className="s4-btn primary"
+                    style={{ textDecoration: 'none', padding: '6px 12px', fontSize: 12 }}
+                    target="_blank"
+                    rel="noreferrer"
+                    href={activeCodeData.demoUrl}
+                  >
+                    Mở demo form <ExternalLink size={13} />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="s4-modal-foot" style={{ justifyContent: 'flex-end' }}>
+              <Btn kind="primary" onClick={() => setViewCodeForm(null)}>Đóng</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function LeadDuplicatesPage(){
+  const [d,setD]=useState({pairs:[],customer_suggestions:[]}), [m,setM]=useState('');
+  const [pairPage, setPairPage] = useState(1);
+  const [serverPage,setServerPage] = useState(1);
+  const [sugPage, setSugPage] = useState(1);
+
+  async function load(){
+    try{
+      setD(await api(`/api/s4/leads/duplicates?page=${serverPage}&per_page=100`))
+    }catch(e){
+      setM(msg(e))
+    }
+  }
+
+  useEffect(()=>{setPairPage(1);load()},[serverPage]);
+
+  async function merge(a,b){
+    const aid=Number(a),bid=Number(b);
+    if(!aid||!bid){setM('Mã Lead không hợp lệ.');return}
+    if(!confirm(`Gộp lead #${bid} vào #${aid}?`))return;
+    try{
+      const res=await api('/api/s4/leads/merge',{method:'POST',body:JSON.stringify({keep_id:aid,merge_id:bid})});
+      setM(res.message||'Gộp Lead thành công.');
+      load()
+    }catch(e){
+      setM(msg(e))
+    }
+  }
+
+  async function linkCustomer(lid,cid){
+    const leadId=Number(lid),custId=Number(cid);
+    if(!leadId||!custId){setM('Mã Lead hoặc khách hàng không hợp lệ.');return}
+    try{
+      const res=await api(`/api/s4/leads/${leadId}/link-customer/${custId}`,{method:'POST'});
+      setM(res.message||'Đã gắn Lead vào khách hàng hiện có.');
+      load()
+    }catch(e){
+      setM(msg(e))
+    }
+  }
+
+  const pairs = d.pairs || [];
+  const suggestions = d.customer_suggestions || [];
+  const displayedPairs = pairs.slice((pairPage-1)*5, pairPage*5);
+  const displayedSuggestions = suggestions.slice((sugPage-1)*5, sugPage*5);
+
+  return <div className="s4-page">
+    <Notice text={m} type={isErrorMessage(m)?'err':'ok'}/>
+    <Card
+      title="Cặp Lead nghi trùng"
+      subtitle="Đối chiếu email, số điện thoại, tên công ty và gợi ý gộp dữ liệu."
+      icon={Merge}
+      actions={
+        <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+          <span className="s4-badge blue" style={{fontWeight:700,padding:'5px 10px',fontSize:'13px',borderRadius:'8px'}}>
+            {pairs.length} cặp nghi trùng
+          </span>
+          <Btn kind="soft" onClick={load}>
+            <RefreshCw size={14}/>Tải lại
+          </Btn>
+        </div>
+      }
+    >
+      {!pairs.length ? (
+        <Empty text="Chưa phát hiện cặp Lead trùng."/>
+      ) : (
+        <>
+          <div className="s4-duplicate-grid">
+            {displayedPairs.map((p,n)=>(
+              <div className="s4-compare" key={n}>
+                <div>
+                  <Badge tone="blue">Bản giữ lại A</Badge>
+                  <h3>{p.a.full_name}</h3>
+                  <p>{p.a.email||'-'} · {p.a.phone||'-'}</p>
+                  <small>{p.a.company||'-'}</small>
+                </div>
+                <div className="s4-merge-arrow">
+                  <Merge size={22}/>
+                  <span>{p.reasons.join(', ')}</span>
+                </div>
+                <div>
+                  <Badge tone="amber">Bản gộp B</Badge>
+                  <h3>{p.b.full_name}</h3>
+                  <p>{p.b.email||'-'} · {p.b.phone||'-'}</p>
+                  <small>{p.b.company||'-'}</small>
+                </div>
+                <Btn onClick={()=>merge(p.a.id,p.b.id)}>
+                  <Merge size={15}/>Gộp
+                </Btn>
+              </div>
+            ))}
+          </div>
+          {pairs.length > 5 && (
+            <Pagination
+              currentPage={pairPage}
+              totalItems={pairs.length}
+              pageSize={5}
+              onPageChange={setPairPage}
+            />
+          )}
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12,alignItems:'center'}}>
+            <Btn kind="soft" onClick={()=>setServerPage(p=>Math.max(1,p-1))} disabled={serverPage<=1}>Trang trước</Btn>
+            <span>Trang dữ liệu {serverPage}</span>
+            <Btn kind="soft" onClick={()=>setServerPage(p=>p+1)} disabled={!d.has_more}>Trang tiếp</Btn>
+          </div>
+        </>
+      )}
+    </Card>
+
+    <Card
+      title="Lead trùng với khách hàng đã có"
+      subtitle="Gợi ý liên kết các lead khớp thông tin với hồ sơ khách hàng hiện có."
+      icon={ShieldCheck}
+      actions={
+        <span className="s4-badge blue" style={{fontWeight:700,padding:'5px 10px',fontSize:'13px',borderRadius:'8px'}}>
+          {suggestions.length} gợi ý
+        </span>
+      }
+    >
+      {!suggestions.length ? (
+        <Empty text="Chưa có gợi ý liên kết khách hàng."/>
+      ) : (
+        <>
+          <div className="s4-table-wrap">
+            <table className="s4-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Khách hàng hiện có</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedSuggestions.map((x,n)=>(
+                  <tr key={n}>
+                    <td>
+                      <b>{x.lead.full_name}</b> · {x.lead.company}
+                      <small style={{display:'block',color:'#64748b'}}>{x.lead.email||'-'} · {x.lead.phone||'-'}</small>
+                    </td>
+                    <td>
+                      <b>#{x.customer.id}</b> {x.customer.name}
+                      <small style={{display:'block',color:'#64748b'}}>{x.customer.email||'-'} · {x.customer.phone||'-'}</small>
+                    </td>
+                    <td>
+                      <button className="s4-inline-btn" onClick={()=>linkCustomer(x.lead.id,x.customer.id)}>
+                        Gắn khách hàng
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {suggestions.length > 5 && (
+            <Pagination
+              currentPage={sugPage}
+              totalItems={suggestions.length}
+              pageSize={5}
+              onPageChange={setSugPage}
+            />
+          )}
+        </>
+      )}
+    </Card>
+  </div>
+}
+
+export function LeadScoringPage(){const[d,setD]=useState({rules:[],hot_min:70,warm_min:40}),[m,setM]=useState('');async function load(){try{setD(await api('/api/s4/scoring'))}catch(e){setM(msg(e))}}useEffect(()=>{load()},[]);function addRule(){setD(x=>({...x,rules:[...x.rules,{criterion:'industry',match_value:'',points:10,sort_order:x.rules.length+1}]}))}function upd(n,k,v){setD(x=>({...x,rules:x.rules.map((r,i)=>i===n?{...r,[k]:v}:r)}))}async function save(){try{setM((await api('/api/s4/scoring',{method:'PUT',body:JSON.stringify({hot_min:Number(d.hot_min),warm_min:Number(d.warm_min),rules:d.rules.map(r=>({...r,points:Number(r.points),sort_order:Number(r.sort_order)}))})})).message);load()}catch(e){setM(msg(e))}}return <div className="s4-page"><Notice text={m} type={isErrorMessage(m)?'err':'ok'}/><Card title="Ngưỡng phân loại" icon={Target}><div className="s4-grid cols-3"><Field label="Nóng từ"><input type="number" value={d.hot_min} onChange={e=>setD({...d,hot_min:e.target.value})}/></Field><Field label="Ấm từ"><input type="number" value={d.warm_min} onChange={e=>setD({...d,warm_min:e.target.value})}/></Field></div></Card><Card title="Tiêu chí tính điểm" icon={Settings2} actions={<Btn kind="soft" onClick={addRule}><Plus size={15}/>Thêm tiêu chí</Btn>}><div className="s4-rule-list">{d.rules.map((r,n)=><div className="s4-rule" key={n}><select value={r.criterion} onChange={e=>upd(n,'criterion',e.target.value)}><option value="industry">Ngành nghề</option><option value="company_size">Quy mô</option><option value="source">Nguồn</option><option value="interest_level">Mức quan tâm</option></select><input placeholder="Giá trị khớp" value={r.match_value} onChange={e=>upd(n,'match_value',e.target.value)}/><input type="number" value={r.points} onChange={e=>upd(n,'points',e.target.value)}/><button type="button" onClick={()=>setD(x=>({...x,rules:x.rules.filter((_,i)=>i!==n)}))}><Trash2 size={16}/></button></div>)}</div><div className="s4-actions"><Btn onClick={save}><Save size={16}/>Lưu & tính lại toàn bộ Lead</Btn></div></Card></div>}
 
 export function LeadAssignmentPage({user}){
   const roles=new Set(user?.roles||[])
@@ -1079,11 +2234,6 @@ export function LeadAssignmentPage({user}){
   }
 
   return <div className="s4-page">
-    <div className="s4-hero"><div>
-      
-      <h1>{canConfigure?'Quy tắc phân bổ Lead':'Hàng chờ phân bổ Lead'}</h1>
-      <p>{canConfigure?'Ưu tiên từ trên xuống; quy tắc đầu tiên khớp sẽ thắng. Lead không khớp sẽ vào hàng chờ để trưởng nhóm phân tay.':'Lead không khớp quy tắc tự động sẽ xuất hiện tại đây. Bạn chỉ có thể phân Lead cho thành viên thuộc nhóm của mình và theo dõi SLA phản hồi.'}</p>
-    </div></div>
     <Notice text={m} type={isErrorMessage(m)?'err':'ok'}/>
 
     {canConfigure&&<Card title="Danh sách quy tắc" icon={GitBranch} actions={<Btn kind="soft" onClick={add}><Plus size={15}/>Thêm quy tắc</Btn>}>
@@ -1100,12 +2250,12 @@ export function LeadAssignmentPage({user}){
     </Card>}
 
     <Card title="Hàng chờ phân bổ thủ công" subtitle={isTeamLeader?(user?.group_name?`Chỉ được phân cho thành viên của ${user.group_name}.`:'Bạn cần được gán nhóm kinh doanh trước khi phân Lead.'):'Lead không khớp quy tắc nào sẽ rơi vào đây để trưởng nhóm phân tay.'} icon={Users} actions={!canConfigure?<Btn kind="soft" onClick={checkSla}><Clock3 size={15}/>Kiểm tra SLA</Btn>:null}>
-      {loading?<Empty text="Đang tải hàng chờ..."/>:!queue.length?<Empty text="Không có Lead chờ phân bổ."/>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Ngành / Khu vực</th><th>Người nhận</th><th>Thao tác</th></tr></thead><tbody>{queue.slice((queuePage-1)*7,queuePage*7).map(x=><tr key={x.id}>
+      {loading?<Empty text="Đang tải hàng chờ..."/>:!queue.length?<Empty text="Không có Lead chờ phân bổ."/>:<><div className="s4-table-wrap"><table className="s4-table"><thead><tr><th>Lead</th><th>Ngành / Khu vực</th><th>Người nhận</th><th>Thao tác</th></tr></thead><tbody>{queue.slice((queuePage-1)*5,queuePage*5).map(x=><tr key={x.id}>
         <td><b>{x.full_name}</b><small>{x.company||'Chưa có công ty'}</small></td>
         <td>{x.industry||'Chưa xác định'} · {x.region||'Chưa xác định'}</td>
         <td><select value={sel[x.id]||''} onChange={e=>setSel(v=>({...v,[x.id]:e.target.value}))} aria-label={`Người nhận ${x.full_name}`}><option value="">Chọn nhân viên</option>{d.users.map(u=><option key={u.id} value={u.id}>{u.full_name}{u.group_name?` · ${u.group_name}`:''}</option>)}</select></td>
         <td><Btn kind="soft" disabled={!sel[x.id]} onClick={()=>assign(x.id)}>Phân công</Btn></td>
-      </tr>)}</tbody></table></div>{queue.length>7&&<Pagination currentPage={queuePage} totalItems={queue.length} pageSize={7} onPageChange={setQueuePage}/>}</>}
+      </tr>)}</tbody></table></div>{queue.length>5&&<Pagination currentPage={queuePage} totalItems={queue.length} pageSize={5} onPageChange={setQueuePage}/>}</>}
     </Card>
   </div>
 }
